@@ -1,0 +1,3 @@
+{
+  "extends": "@trend-x/config/tsconfig.base.json"
+}

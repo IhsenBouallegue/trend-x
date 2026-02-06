@@ -1,0 +1,54 @@
+{
+  "name": "trend-x",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ],
+    "catalog": {
+      "dotenv": "^17.2.2",
+      "zod": "^4.1.13",
+      "typescript": "^5",
+      "@types/bun": "^1.3.4",
+      "hono": "^4.8.2",
+      "@trpc/server": "^11.7.2",
+      "@libsql/client": "0.15.15",
+      "libsql": "0.5.22",
+      "@trpc/client": "^11.7.2"
+    }
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "dev:native": "turbo -F native dev",
+    "dev:web": "turbo -F web dev",
+    "dev:server": "turbo -F server dev",
+    "db:push": "turbo -F @trend-x/db db:push",
+    "db:studio": "turbo -F @trend-x/db db:studio",
+    "db:generate": "turbo -F @trend-x/db db:generate",
+    "db:migrate": "turbo -F @trend-x/db db:migrate",
+    "db:local": "turbo -F @trend-x/db db:local",
+    "check": "biome check --write ."
+  },
+  "dependencies": {
+    "@trend-x/env": "workspace:*",
+    "dotenv": "catalog:",
+    "exponential-backoff": "^3.1.3",
+    "trend-x": ".",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
+    "@trend-x/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "turbo": "^2.6.3",
+    "typescript": "catalog:"
+  },
+  "optionalDependencies": {
+    "@libsql/linux-x64-gnu": "0.15.15"
+  },
+  "packageManager": "bun@1.3.6"
+}

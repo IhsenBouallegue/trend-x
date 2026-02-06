@@ -1,0 +1,21 @@
+---
+description: Use Bun instead of Node.js, npm, pnpm, or vite.
+globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
+alwaysApply: true
+---
+
+# Use Bun (project instructions)
+
+Follow the instructions in **use-bun-instead-of-node-vite-npm-pnpm.mdc** at the project root. Summary:
+
+- Use **Bun** instead of Node.js, npm, pnpm, yarn, or vite.
+- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
+- Use `bun test` instead of `jest` or `vitest`
+- Use `bun install` instead of `npm install` / `yarn` / `pnpm install`
+- Use `bun run <script>` instead of `npm run` / `yarn` / `pnpm run`
+- Bun loads `.env` automatically; avoid adding dotenv when not needed.
+- Prefer `Bun.serve()` over express; `bun:sqlite` over better-sqlite3; `Bun.file` over node:fs; built-in `WebSocket` over `ws`.
+- For tests use `bun test` and `bun:test` (see root file for examples).
+- Frontend: the rule file prefers Bun HTML imports over vite; this project uses Next.js, so keep Next.js for the web app and use Bun for scripts, server, and tooling.
+
+When in doubt, open **use-bun-instead-of-node-vite-npm-pnpm.mdc** at the repo root for full details and examples.

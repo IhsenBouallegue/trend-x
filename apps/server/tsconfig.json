@@ -1,0 +1,9 @@
+{
+  "extends": "@trend-x/config/tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx"
+  }
+}
