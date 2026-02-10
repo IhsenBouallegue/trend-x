@@ -53,4 +53,19 @@ export const queryKeys = {
     metrics: (accountId: string) =>
       [["profile", "getMetrics"], { input: { accountId } }] as const,
   },
+  social: {
+    all: [["social"]] as const,
+    snapshotHistory: (accountId: string) =>
+      [["social", "getSnapshotHistory"], { input: { accountId } }] as const,
+    followerChart: (accountId: string, days?: number) =>
+      [["social", "getFollowerChart"], { input: { accountId, days } }] as const,
+    connections: (accountId: string, direction?: string) =>
+      [["social", "getConnections"], { input: { accountId, direction } }] as const,
+    recentChanges: (accountId: string) =>
+      [["social", "getRecentChanges"], { input: { accountId } }] as const,
+    graphData: (accountId?: string) =>
+      [["social", "getGraphData"], { input: { accountId } }] as const,
+    stats: (accountId: string) =>
+      [["social", "getStats"], { input: { accountId } }] as const,
+  },
 } as const;
