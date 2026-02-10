@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 ## Current Position
 
 Phase: 16 of 16 (Social Graph and Social Signals)
-Plan: 2 of 5
-Status: Completed 16-01-PLAN.md
-Last activity: 2026-02-11 — Completed 16-01-PLAN.md (social graph schema + service)
+Plan: 4 of 5
+Status: Completed 16-03-PLAN.md
+Last activity: 2026-02-11 — Completed 16-03-PLAN.md (social tRPC router + React Query hooks)
 
-Progress: Phase 16 [##--------] 20% (1/5 plans)
+Progress: Phase 16 [######----] 60% (3/5 plans)
 
 ## Performance Metrics
 
@@ -84,9 +84,9 @@ Progress: Phase 16 [##--------] 20% (1/5 plans)
 - Average: 4.9 min/plan
 
 **Phase 16 Performance:**
-- Plans: 1 complete
-- Duration: 8 min (8 min)
-- Average: 8 min/plan
+- Plans: 2 complete
+- Duration: 11 min (8 min + 3 min)
+- Average: 5.5 min/plan
 
 ## Accumulated Context
 
@@ -262,6 +262,11 @@ Recent decisions from PROJECT.md affecting v2.0 work:
 - 16-01: Individual update loops for removed connections instead of batch inArray (simpler for SQLite)
 - 16-01: Early-stop carries over previous IDs to avoid false removal detection on partial fetches
 - 16-01: Mutual connections stored as direction="mutual" (single row, not dual following+follower)
+- 16-02: Template-based explanations instead of LLM calls for social signals (speed over polish)
+- 16-02: 20% threshold for follower spike/drop, 30% for following spike (stricter than profile detection)
+- 16-02: Notable follower: isBlueVerified OR followerCount > 10,000
+- 16-02: Mutual connection detection checks both directions (new following who is follower, new follower who is followed)
+- 16-02: maxConcurrent: 1 for social_snapshot jobs (Twitter API rate limit safety)
 
 ### Pending Todos
 
@@ -301,8 +306,8 @@ Recent decisions from PROJECT.md affecting v2.0 work:
 
 ## Session Continuity
 
-Last session: 2026-02-11 (Phase 16 Plan 01 - Social Graph Schema + Service)
-Stopped at: Completed 16-01-PLAN.md
+Last session: 2026-02-11 (Phase 16 Plan 02 - Social Signal Detection + Snapshot Job)
+Stopped at: Completed 16-02-PLAN.md
 Resume file: None
 
-**Next action:** Execute 16-02-PLAN.md (next plan in Phase 16)
+**Next action:** Execute 16-03-PLAN.md (next plan in Phase 16)
