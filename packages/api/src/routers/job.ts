@@ -23,7 +23,7 @@ export const jobRouter = router({
     .input(
       z.object({
         accountId: z.string(),
-        jobType: z.enum(["profile_update", "ingest"]),
+        jobType: z.enum(["profile_update", "ingest", "social_snapshot"]),
       }),
     )
     .mutation(async ({ input }) => {

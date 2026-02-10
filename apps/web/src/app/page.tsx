@@ -6,7 +6,9 @@ import { NotificationList } from "@/components/dashboard/notifications/notificat
 import { OverviewDashboard } from "@/components/dashboard/overview/overview-dashboard";
 import { PipelineProgress } from "@/components/dashboard/pipeline-progress";
 import { ProfileSection } from "@/components/dashboard/profile-section";
+import { RunControls } from "@/components/dashboard/run-controls";
 import { RunHistory } from "@/components/dashboard/run-history";
+import { SocialSection } from "@/components/dashboard/social-section";
 import { TweetHeatmap } from "@/components/dashboard/tweet-heatmap";
 import { useAccount } from "@/contexts/account-context";
 import { useAccountCount, useAccountList, useConfigIsConfigured } from "@/hooks/queries";
@@ -66,11 +68,14 @@ export default function DashboardPage() {
   return (
     <div className="container mx-auto max-w-5xl space-y-10 p-4">
       {/* Header */}
-      <div>
-        <h1 className="font-bold text-2xl">
-          {selectedAccount ? `@${selectedAccount.handle}` : "Dashboard"}
-        </h1>
-        <p className="mt-1 text-muted-foreground text-sm">Live behavioral profile</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="font-bold text-2xl">
+            {selectedAccount ? `@${selectedAccount.handle}` : "Dashboard"}
+          </h1>
+          <p className="mt-1 text-muted-foreground text-sm">Live behavioral profile</p>
+        </div>
+        <RunControls />
       </div>
 
       {/* Pipeline progress */}
@@ -81,6 +86,9 @@ export default function DashboardPage() {
 
       {/* Live Profile section */}
       <ProfileSection accountId={selectedAccountId} />
+
+      {/* Social Graph section */}
+      <SocialSection accountId={selectedAccountId} />
 
       {/* Tweet activity heatmap */}
       <TweetHeatmap />
