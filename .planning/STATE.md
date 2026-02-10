@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 ## Current Position
 
 Phase: 16 of 16 (Social Graph and Social Signals)
-Plan: 4 of 5
-Status: Completed 16-03-PLAN.md
-Last activity: 2026-02-11 — Completed 16-03-PLAN.md (social tRPC router + React Query hooks)
+Plan: 5 of 5
+Status: Completed 16-04-PLAN.md
+Last activity: 2026-02-11 — Completed 16-04-PLAN.md (social graph UI components)
 
-Progress: Phase 16 [######----] 60% (3/5 plans)
+Progress: Phase 16 [########--] 80% (4/5 plans)
 
 ## Performance Metrics
 
@@ -84,9 +84,9 @@ Progress: Phase 16 [######----] 60% (3/5 plans)
 - Average: 4.9 min/plan
 
 **Phase 16 Performance:**
-- Plans: 3 complete
-- Duration: 14 min (8 min + 3 min + 3 min)
-- Average: 4.7 min/plan
+- Plans: 4 complete
+- Duration: 17 min (8 min + 3 min + 3 min + 3 min)
+- Average: 4.3 min/plan
 
 ## Accumulated Context
 
@@ -271,6 +271,10 @@ Recent decisions from PROJECT.md affecting v2.0 work:
 - 16-03: Graph data identifies cross-monitored-account links by matching connection usernames to account handles
 - 16-03: Notable connections in graph: blue verified OR >10k followers
 - 16-03: Stale times: 60s for charts/graph (slow-changing), 30s for snapshots/connections/stats (moderate)
+- 16-04: AreaChart (not LineChart) for follower trends with fill beneath lines
+- 16-04: Force graph uses HSL values directly (canvas cannot resolve CSS custom properties)
+- 16-04: ResizeObserver for responsive graph width, fixed 400px height
+- 16-04: Dynamic import with ssr: false for react-force-graph-2d (canvas-based, no SSR)
 
 ### Pending Todos
 
@@ -310,8 +314,8 @@ Recent decisions from PROJECT.md affecting v2.0 work:
 
 ## Session Continuity
 
-Last session: 2026-02-11 (Phase 16 Plan 03 - Social tRPC Router + React Query Hooks)
-Stopped at: Completed 16-03-PLAN.md
+Last session: 2026-02-11 (Phase 16 Plan 04 - Social Graph UI Components)
+Stopped at: Completed 16-04-PLAN.md
 Resume file: None
 
-**Next action:** Execute 16-04-PLAN.md (next plan in Phase 16)
+**Next action:** Execute 16-05-PLAN.md (next plan in Phase 16)
