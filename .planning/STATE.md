@@ -84,9 +84,9 @@ Progress: Phase 16 [######----] 60% (3/5 plans)
 - Average: 4.9 min/plan
 
 **Phase 16 Performance:**
-- Plans: 2 complete
-- Duration: 11 min (8 min + 3 min)
-- Average: 5.5 min/plan
+- Plans: 3 complete
+- Duration: 14 min (8 min + 3 min + 3 min)
+- Average: 4.7 min/plan
 
 ## Accumulated Context
 
@@ -267,6 +267,10 @@ Recent decisions from PROJECT.md affecting v2.0 work:
 - 16-02: Notable follower: isBlueVerified OR followerCount > 10,000
 - 16-02: Mutual connection detection checks both directions (new following who is follower, new follower who is followed)
 - 16-02: maxConcurrent: 1 for social_snapshot jobs (Twitter API rate limit safety)
+- 16-03: Social router queries DB directly (no service layer indirection for read-only queries)
+- 16-03: Graph data identifies cross-monitored-account links by matching connection usernames to account handles
+- 16-03: Notable connections in graph: blue verified OR >10k followers
+- 16-03: Stale times: 60s for charts/graph (slow-changing), 30s for snapshots/connections/stats (moderate)
 
 ### Pending Todos
 
@@ -306,8 +310,8 @@ Recent decisions from PROJECT.md affecting v2.0 work:
 
 ## Session Continuity
 
-Last session: 2026-02-11 (Phase 16 Plan 02 - Social Signal Detection + Snapshot Job)
-Stopped at: Completed 16-02-PLAN.md
+Last session: 2026-02-11 (Phase 16 Plan 03 - Social tRPC Router + React Query Hooks)
+Stopped at: Completed 16-03-PLAN.md
 Resume file: None
 
-**Next action:** Execute 16-03-PLAN.md (next plan in Phase 16)
+**Next action:** Execute 16-04-PLAN.md (next plan in Phase 16)
