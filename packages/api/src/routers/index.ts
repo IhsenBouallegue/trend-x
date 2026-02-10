@@ -8,6 +8,7 @@ import { notificationRouter } from "./notification";
 import { overviewRouter } from "./overview";
 import { profileRouter } from "./profile";
 import { scheduleRouter } from "./schedule";
+import { socialRouter } from "./social";
 import { telegramRouter } from "./telegram";
 import { tweetRouter } from "./tweet";
 
@@ -24,6 +25,7 @@ export const appRouter = router({
   overview: overviewRouter,
   profile: profileRouter,
   schedule: scheduleRouter,
+  social: socialRouter,
   telegram: telegramRouter,
   tweet: tweetRouter,
 });
