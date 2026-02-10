@@ -7,6 +7,8 @@ export * from "./pipeline-run";
 export * from "./pipeline-step";
 export * from "./profile-activity-log";
 export * from "./scheduled-job";
+export * from "./social-connection";
+export * from "./social-snapshot";
 export * from "./token-usage";
 export * from "./topic-drift-buffer";
 export * from "./tweet";
