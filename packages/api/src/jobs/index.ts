@@ -8,6 +8,7 @@
 // Import definitions to trigger registration (side-effect imports)
 import "./definitions/ingest-job";
 import "./definitions/profile-update-job";
+import "./definitions/social-snapshot-job";
 
 // Re-export public API
 export { defineJob, getJobDefinition, getAllJobTypes } from "./registry";
