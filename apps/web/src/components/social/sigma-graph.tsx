@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Graph from "graphology";
 import { SigmaContainer, useSigma, useSetSettings } from "@react-sigma/core";
 import { useWorkerLayoutForceAtlas2 } from "@react-sigma/layout-forceatlas2";
@@ -20,6 +20,7 @@ interface GraphLink {
   source: string;
   target: string;
   isMutual: boolean;
+  direction?: "following" | "follower" | "mutual";
   firstSeenAt?: number;
   deactivatedAt?: number | null;
 }
@@ -33,12 +34,16 @@ interface SigmaGraphProps {
   currentTime?: number;
 }
 
+type EdgeDirection = "following" | "follower" | "mutual";
+
 // Dark theme colors matching the app's green primary palette
 const COLORS = {
   selfNode: "#4ade80",
   monitoredNode: "#2dd4bf",
   defaultNode: "#475569",
   mutualEdge: "rgba(74, 222, 128, 0.4)",
+  followingEdge: "rgba(96, 165, 250, 0.5)",   // blue — account follows them
+  followerEdge: "rgba(251, 146, 60, 0.5)",     // orange — they follow account
   defaultEdge: "rgba(51, 65, 85, 0.35)",
   label: "#a1a1aa",
 };
@@ -79,7 +84,19 @@ function ForceAtlas2Layout() {
   return null;
 }
 
-function Legend() {
+function Legend({
+  hiddenDirections,
+  onToggle,
+}: {
+  hiddenDirections: Set<EdgeDirection>;
+  onToggle: (dir: EdgeDirection) => void;
+}) {
+  const edgeItems: { dir: EdgeDirection; color: string; label: string }[] = [
+    { dir: "mutual", color: COLORS.mutualEdge, label: "Mutual follow" },
+    { dir: "following", color: COLORS.followingEdge, label: "Following" },
+    { dir: "follower", color: COLORS.followerEdge, label: "Followed by" },
+  ];
+
   return (
     <div className="absolute bottom-3 left-3 flex flex-col gap-1.5 rounded-none border border-border bg-card/90 px-3 py-2 text-[11px] text-muted-foreground backdrop-blur-sm">
       <div className="flex items-center gap-2">
@@ -103,19 +120,27 @@ function Legend() {
         />
         Notable connection
       </div>
-      <div className="mt-0.5 border-t border-border pt-1.5 flex items-center gap-2">
-        <span
-          className="inline-block h-0.5 w-3 shrink-0 rounded-full"
-          style={{ background: COLORS.selfNode, opacity: 0.6 }}
-        />
-        Mutual follow
-      </div>
-      <div className="flex items-center gap-2">
-        <span
-          className="inline-block h-px w-3 shrink-0 rounded-full"
-          style={{ background: COLORS.defaultNode }}
-        />
-        One-way follow
+      <div className="mt-0.5 border-t border-border pt-1.5 flex flex-col gap-1.5">
+        {edgeItems.map(({ dir, color, label }) => {
+          const hidden = hiddenDirections.has(dir);
+          return (
+            <button
+              key={dir}
+              type="button"
+              onClick={() => onToggle(dir)}
+              className="flex items-center gap-2 transition-opacity hover:text-foreground"
+              style={{ opacity: hidden ? 0.35 : 1 }}
+            >
+              <span
+                className="inline-block h-0.5 w-3 shrink-0 rounded-full transition-opacity"
+                style={{ background: color }}
+              />
+              <span className={hidden ? "line-through" : ""}>
+                {label}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -160,9 +185,33 @@ function buildGraph(data: SigmaGraphProps["data"], accountId?: string): Graph {
     if (!graph.hasNode(link.source) || !graph.hasNode(link.target)) continue;
     if (graph.hasDirectedEdge(link.source, link.target)) continue;
 
+    const dir: EdgeDirection =
+      link.isMutual || link.direction === "mutual"
+        ? "mutual"
+        : link.direction === "follower"
+          ? "follower"
+          : "following";
+
+    let edgeColor: string;
+    let edgeSize: number;
+    if (dir === "mutual") {
+      edgeColor = COLORS.mutualEdge;
+      edgeSize = 1.5;
+    } else if (dir === "follower") {
+      edgeColor = COLORS.followerEdge;
+      edgeSize = 0.8;
+    } else if (dir === "following") {
+      edgeColor = COLORS.followingEdge;
+      edgeSize = 0.8;
+    } else {
+      edgeColor = COLORS.defaultEdge;
+      edgeSize = 0.5;
+    }
+
     graph.addDirectedEdge(link.source, link.target, {
-      color: link.isMutual ? COLORS.mutualEdge : COLORS.defaultEdge,
-      size: link.isMutual ? 1.5 : 0.5,
+      color: edgeColor,
+      size: edgeSize,
+      direction: dir,
       firstSeenAt: link.firstSeenAt,
       deactivatedAt: link.deactivatedAt,
     });
@@ -183,14 +232,20 @@ function isVisibleAtTime(
   return firstSeenAt <= currentTime && (deactivatedAt == null || deactivatedAt > currentTime);
 }
 
-function TimelineFilter({ currentTime }: { currentTime?: number }) {
+/** Combined filter: handles both timeline visibility and direction toggle. */
+function GraphFilters({
+  currentTime,
+  hiddenDirections,
+}: {
+  currentTime?: number;
+  hiddenDirections: Set<EdgeDirection>;
+}) {
   const setSettings = useSetSettings();
 
   useEffect(() => {
-    if (currentTime === undefined) return;
-
     setSettings({
       nodeReducer: (_node, data) => {
+        if (currentTime === undefined) return data;
         const attrs = data as Record<string, unknown>;
         const visible = isVisibleAtTime(
           attrs.firstSeenAt as number | undefined,
@@ -201,21 +256,48 @@ function TimelineFilter({ currentTime }: { currentTime?: number }) {
       },
       edgeReducer: (_edge, data) => {
         const attrs = data as Record<string, unknown>;
-        const visible = isVisibleAtTime(
-          attrs.firstSeenAt as number | undefined,
-          attrs.deactivatedAt as number | null | undefined,
-          currentTime,
-        );
-        return { ...data, type: "arrow" as const, hidden: !visible };
+
+        // Direction filter
+        const dir = attrs.direction as EdgeDirection | undefined;
+        if (dir && hiddenDirections.has(dir)) {
+          return { ...data, type: "arrow" as const, hidden: true };
+        }
+
+        // Timeline filter
+        if (currentTime !== undefined) {
+          const visible = isVisibleAtTime(
+            attrs.firstSeenAt as number | undefined,
+            attrs.deactivatedAt as number | null | undefined,
+            currentTime,
+          );
+          if (!visible) {
+            return { ...data, type: "arrow" as const, hidden: true };
+          }
+        }
+
+        return { ...data, type: "arrow" as const, hidden: false };
       },
     });
-  }, [currentTime, setSettings]);
+  }, [currentTime, hiddenDirections, setSettings]);
 
   return null;
 }
 
 export default function SigmaGraph({ data, accountId, currentTime }: SigmaGraphProps) {
   const graph = useMemo(() => buildGraph(data, accountId), [data, accountId]);
+  const [hiddenDirections, setHiddenDirections] = useState<Set<EdgeDirection>>(new Set());
+
+  function handleToggle(dir: EdgeDirection) {
+    setHiddenDirections((prev) => {
+      const next = new Set(prev);
+      if (next.has(dir)) {
+        next.delete(dir);
+      } else {
+        next.add(dir);
+      }
+      return next;
+    });
+  }
 
   return (
     <div className="relative rounded-none overflow-hidden border border-border">
@@ -240,9 +322,9 @@ export default function SigmaGraph({ data, accountId, currentTime }: SigmaGraphP
         }}
       >
         <ForceAtlas2Layout />
-        <TimelineFilter currentTime={currentTime} />
+        <GraphFilters currentTime={currentTime} hiddenDirections={hiddenDirections} />
       </SigmaContainer>
-      <Legend />
+      <Legend hiddenDirections={hiddenDirections} onToggle={handleToggle} />
     </div>
   );
 }

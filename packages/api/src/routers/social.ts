@@ -197,6 +197,7 @@ export const socialRouter = router({
         source: string;
         target: string;
         isMutual: boolean;
+        direction: "following" | "follower" | "mutual";
       };
 
       const nodes: GraphNode[] = [];
@@ -275,7 +276,9 @@ export const socialRouter = router({
             }
 
             // Link between monitored accounts
-            const isMutual = conn.direction === "mutual";
+            // Arrow means "follows": source follows target
+            const dir = conn.direction as "following" | "follower" | "mutual";
+            const isMutual = dir === "mutual";
             const linkKey = [acct.id, monitoredId].sort().join("-");
             const existingLink = links.find(
               (l) =>
@@ -283,13 +286,18 @@ export const socialRouter = router({
             );
 
             if (!existingLink) {
+              // For "follower" direction, the connection follows the account,
+              // so swap source/target so arrow points correctly
+              const isFollower = dir === "follower";
               links.push({
-                source: acct.id,
-                target: monitoredId,
+                source: isFollower ? monitoredId : acct.id,
+                target: isFollower ? acct.id : monitoredId,
                 isMutual,
+                direction: dir,
               });
             } else if (isMutual) {
               existingLink.isMutual = true;
+              existingLink.direction = "mutual";
             }
           } else {
             // Notable non-monitored connection (shared or verified/high-follower)
@@ -309,10 +317,13 @@ export const socialRouter = router({
             }
 
             if (isNotable) {
+              const connDir = conn.direction as "following" | "follower" | "mutual";
+              const isFollowerDir = connDir === "follower";
               links.push({
-                source: acct.id,
-                target: conn.userId,
-                isMutual: conn.direction === "mutual",
+                source: isFollowerDir ? conn.userId : acct.id,
+                target: isFollowerDir ? acct.id : conn.userId,
+                isMutual: connDir === "mutual",
+                direction: connDir,
               });
             }
           }
@@ -438,6 +449,7 @@ export const socialRouter = router({
       source: string;
       target: string;
       isMutual: boolean;
+      direction: "following" | "follower" | "mutual";
       firstSeenAt: number;
       deactivatedAt: number | null;
     };
@@ -515,10 +527,13 @@ export const socialRouter = router({
       if (!sharedUserIds.has(conn.userId)) continue;
       if (!nodeIds.has(conn.accountId) || !nodeIds.has(conn.userId)) continue;
 
+      const crossDir = conn.direction as "following" | "follower" | "mutual";
+      const isCrossFollower = crossDir === "follower";
       links.push({
-        source: conn.accountId,
-        target: conn.userId,
-        isMutual: conn.direction === "mutual",
+        source: isCrossFollower ? conn.userId : conn.accountId,
+        target: isCrossFollower ? conn.accountId : conn.userId,
+        isMutual: crossDir === "mutual",
+        direction: crossDir,
         firstSeenAt: conn.firstSeenAt,
         deactivatedAt: conn.deactivatedAt,
       });
@@ -546,6 +561,22 @@ export const socialRouter = router({
       },
     };
   }),
+
+  /**
+   * Delete all social data (connections + snapshots) for an account.
+   * Dev tool for resetting social graph state.
+   */
+  deleteData: publicProcedure
+    .input(z.object({ accountId: z.string() }))
+    .mutation(async ({ input }) => {
+      await db
+        .delete(socialConnection)
+        .where(eq(socialConnection.accountId, input.accountId));
+      await db
+        .delete(socialSnapshot)
+        .where(eq(socialSnapshot.accountId, input.accountId));
+      return { success: true };
+    }),
 
   /**
    * Get summary stats for an account's social connections.

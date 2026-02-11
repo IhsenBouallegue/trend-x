@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, trpc } from "@/utils/trpc";
 import { queryKeys } from "./query-keys";
 
@@ -35,12 +35,14 @@ export function useSocialConnections(
   accountId: string | null,
   direction?: "following" | "follower" | "mutual",
   notableOnly?: boolean,
+  limit?: number,
 ) {
   return useQuery({
     ...trpc.social.getConnections.queryOptions({
       accountId: accountId || "",
       direction,
       notableOnly,
+      limit,
     }),
     enabled: !!accountId,
     staleTime: 30_000,
@@ -85,6 +87,21 @@ export function useSocialStats(accountId: string | null) {
     enabled: !!accountId,
     staleTime: 30_000,
   });
+}
+
+export function useDeleteSocialData(options?: {
+  onSuccess?: () => void;
+  onError?: (error: { message: string }) => void;
+}) {
+  return useMutation(
+    trpc.social.deleteData.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.social.all });
+        options?.onSuccess?.();
+      },
+      onError: (error) => options?.onError?.(error),
+    }),
+  );
 }
 
 export function useInvalidateSocial() {

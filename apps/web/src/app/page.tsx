@@ -10,6 +10,7 @@ import { RunControls } from "@/components/dashboard/run-controls";
 import { RunHistory } from "@/components/dashboard/run-history";
 import { SocialSection } from "@/components/dashboard/social-section";
 import { TweetHeatmap } from "@/components/dashboard/tweet-heatmap";
+import { DevToolsFloat } from "@/components/settings/dev-tools-section";
 import { useAccount } from "@/contexts/account-context";
 import { useAccountCount, useAccountList, useConfigIsConfigured } from "@/hooks/queries";
 
@@ -67,6 +68,7 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto max-w-5xl space-y-10 p-4">
+      <DevToolsFloat />
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>

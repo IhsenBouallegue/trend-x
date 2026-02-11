@@ -382,8 +382,18 @@ function findSummaryValue(steps: StepRecord[], key: string): unknown {
 function formatStepSummary(stage: string, summary: Record<string, unknown>): string {
   switch (stage) {
     case "fetching": {
-      const count = summary.tweetCount as number;
-      return `${count} tweet${count === 1 ? "" : "s"}`;
+      if (summary.tweetCount != null) {
+        const count = summary.tweetCount as number;
+        return `${count} tweet${count === 1 ? "" : "s"}`;
+      }
+      if (summary.followingCount != null) {
+        const parts: string[] = [];
+        parts.push(`${summary.followingCount} following`);
+        parts.push(`${summary.followerCount} followers`);
+        if (summary.mutualCount) parts.push(`${summary.mutualCount} mutual`);
+        return parts.join(", ");
+      }
+      return "done";
     }
     case "embedding": {
       const count = summary.embeddingCount as number;
@@ -402,6 +412,18 @@ function formatStepSummary(stage: string, summary: Record<string, unknown>): str
       if (summary.personalityEvaluated) parts.push("personality updated");
       return parts.join(", ") || "done";
     }
+    case "processing": {
+      const parts: string[] = [];
+      const fAdded = (summary.followingAdded as number) || 0;
+      const fRemoved = (summary.followingRemoved as number) || 0;
+      const rAdded = (summary.followersAdded as number) || 0;
+      const rRemoved = (summary.followersRemoved as number) || 0;
+      if (fAdded || fRemoved) parts.push(`following +${fAdded}/-${fRemoved}`);
+      if (rAdded || rRemoved) parts.push(`followers +${rAdded}/-${rRemoved}`);
+      return parts.length > 0 ? parts.join(", ") : "no changes";
+    }
+    case "completing":
+      return "done";
     case "detecting": {
       if (summary.isBaseline) return "baseline set";
       const count = summary.changesDetected as number;
