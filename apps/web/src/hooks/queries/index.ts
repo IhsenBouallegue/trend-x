@@ -10,3 +10,4 @@ export * from "./use-telegram-queries";
 export * from "./use-schedule-queries";
 export * from "./use-profile-queries";
 export * from "./use-social-queries";
+export * from "./use-job-queries";

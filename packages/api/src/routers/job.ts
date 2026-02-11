@@ -154,4 +154,37 @@ export const jobRouter = router({
         steps,
       };
     }),
+
+  /**
+   * Get all active runs (queued or running) for an account.
+   * Returns array of runs with their steps, ordered by startedAt desc.
+   */
+  getActiveRuns: publicProcedure
+    .input(z.object({ accountId: z.string() }))
+    .query(async ({ input }) => {
+      const runs = await db
+        .select()
+        .from(pipelineRun)
+        .where(
+          and(
+            eq(pipelineRun.accountId, input.accountId),
+            or(eq(pipelineRun.status, "running"), eq(pipelineRun.status, "queued")),
+          ),
+        )
+        .orderBy(desc(pipelineRun.startedAt));
+
+      const runsWithSteps = await Promise.all(
+        runs.map(async (run) => {
+          const steps = await db
+            .select()
+            .from(pipelineStep)
+            .where(eq(pipelineStep.runId, run.id))
+            .orderBy(pipelineStep.stepOrder);
+
+          return { ...run, steps };
+        }),
+      );
+
+      return runsWithSteps;
+    }),
 });

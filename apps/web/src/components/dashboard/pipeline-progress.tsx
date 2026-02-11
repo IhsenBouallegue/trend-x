@@ -1,58 +1,40 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
-import { useJobPolling } from "@/hooks/use-job-polling";
-import { useTelegramStatus } from "@/hooks/queries";
-import { queryKeys } from "@/hooks/queries/query-keys";
+import { useAccount } from "@/contexts/account-context";
+import { useActiveJobs, useTelegramStatus } from "@/hooks/queries";
 import { PipelineStepper } from "./pipeline-stepper";
 import type { PipelineState, PipelineStage, StepRecord } from "./pipeline-stepper";
 
 export function PipelineProgress() {
-  const { job, jobId } = useJobPolling();
+  const { selectedAccountId } = useAccount();
+  const { allVisibleJobs, dismissCompleted } = useActiveJobs(selectedAccountId);
   const { data: telegramStatus } = useTelegramStatus();
-  const queryClient = useQueryClient();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const hasInvalidatedRef = useRef<string | null>(null);
 
-  // Invalidate related queries when job completes
-  useEffect(() => {
-    if (job?.status === "completed" && jobId && hasInvalidatedRef.current !== jobId) {
-      hasInvalidatedRef.current = jobId;
-      queryClient.invalidateQueries({ queryKey: queryKeys.tweet.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.profile.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.overview.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.notification.all });
-    }
-  }, [job?.status, jobId, queryClient]);
+  if (allVisibleJobs.length === 0) return null;
 
-  // Auto-clear jobId from URL after terminal state + delay
-  useEffect(() => {
-    if (job?.status === "completed") {
-      const timer = setTimeout(() => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.delete("jobId");
-        const newSearch = params.toString();
-        router.replace(newSearch ? `?${newSearch}` : "/");
-      }, 63000); // 60s visible + 3s buffer
-      return () => clearTimeout(timer);
-    }
-  }, [job?.status, router, searchParams]);
+  return (
+    <div className="space-y-2">
+      {allVisibleJobs.map((job) => {
+        const pipelineState = mapJobToPipelineState(job);
+        const allSteps = mapJobStepsToStepRecords(job.steps);
 
-  if (!jobId || !job) return null;
+        // Hide "notifying" step when Telegram notifications aren't enabled
+        const steps = telegramStatus?.enabled
+          ? allSteps
+          : allSteps.filter((s) => s.stage !== "notifying");
 
-  // Transform job data to match PipelineStepper props
-  const pipelineState = mapJobToPipelineState(job);
-  const allSteps = mapJobStepsToStepRecords(job.steps);
-
-  // Hide "notifying" step when Telegram notifications aren't enabled
-  const steps = telegramStatus?.enabled
-    ? allSteps
-    : allSteps.filter((s) => s.stage !== "notifying");
-
-  return <PipelineStepper steps={steps} pipelineState={pipelineState} />;
+        return (
+          <PipelineStepper
+            key={job.id}
+            steps={steps}
+            pipelineState={pipelineState}
+            jobType={job.pipelineType}
+            onDismissed={() => dismissCompleted(job.id)}
+          />
+        );
+      })}
+    </div>
+  );
 }
 
 /**

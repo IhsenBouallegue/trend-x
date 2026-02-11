@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 Phase: 16 of 16 (Social Graph and Social Signals)
 Plan: 5 of 5
 Status: Completed 16-04-PLAN.md
-Last activity: 2026-02-11 — Completed 16-04-PLAN.md (social graph UI components)
+Last activity: 2026-02-11 — Completed quick task 8: Add cross-account social graph to overview dashboard
 
 Progress: Phase 16 [########--] 80% (4/5 plans)
 
@@ -311,11 +311,12 @@ Recent decisions from PROJECT.md affecting v2.0 work:
 | 005 | Centralize React Query hooks                     | 2026-02-05 | 946d53c | [005-centralize-react-query-hooks](./quick/005-centralize-react-query-hooks/) |
 | 006 | Improve header navigation                        | 2026-02-06 | 5077e57 | [006-improve-header-navigation](./quick/006-improve-header-navigation/) |
 | 007 | Generate personality avatar art                  | 2026-02-06 | 0f2d41d | [007-generate-personality-avatar-art](./quick/007-generate-personality-avatar-art/) |
+| 008 | Add cross-account social graph to overview       | 2026-02-11 | c7174c0 | [8-add-a-social-graph-on-the-dashboard-that](./quick/8-add-a-social-graph-on-the-dashboard-that/) |
 
 ## Session Continuity
 
-Last session: 2026-02-11 (Phase 16 Plan 04 - Social Graph UI Components)
-Stopped at: Completed 16-04-PLAN.md
+Last session: 2026-02-11 (Quick Task 008 - Cross-Account Social Graph)
+Stopped at: Completed quick-008
 Resume file: None
 
 **Next action:** Execute 16-05-PLAN.md (next plan in Phase 16)

@@ -1,9 +1,8 @@
 "use client";
 
 import { ChevronDown, Loader2, RefreshCw, Users } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,18 +12,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAccount } from "@/contexts/account-context";
 import { trpc } from "@/utils/trpc";
+import { queryKeys } from "@/hooks/queries/query-keys";
 
 export function RunControls() {
   const { selectedAccountId } = useAccount();
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
 
   const mutation = useMutation(
     trpc.job.trigger.mutationOptions({
-      onSuccess: (data) => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("jobId", data.jobId);
-        router.replace(`?${params.toString()}`);
+      onSuccess: () => {
+        // Polling will pick up the new job via getActiveRuns
+        if (selectedAccountId) {
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.job.activeRuns(selectedAccountId),
+          });
+        }
       },
       onError: (error: { message: string }) => {
         toast.error(error?.message || "Failed to start job");

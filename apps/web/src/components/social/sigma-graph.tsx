@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import Graph from "graphology";
-import { SigmaContainer, useSigma } from "@react-sigma/core";
+import { SigmaContainer, useSigma, useSetSettings } from "@react-sigma/core";
 import { useWorkerLayoutForceAtlas2 } from "@react-sigma/layout-forceatlas2";
 import "@react-sigma/core/lib/style.css";
 
@@ -12,12 +12,16 @@ interface GraphNode {
   val: number;
   color?: string;
   isMonitored: boolean;
+  firstSeenAt?: number;
+  deactivatedAt?: number | null;
 }
 
 interface GraphLink {
   source: string;
   target: string;
   isMutual: boolean;
+  firstSeenAt?: number;
+  deactivatedAt?: number | null;
 }
 
 interface SigmaGraphProps {
@@ -26,6 +30,7 @@ interface SigmaGraphProps {
     links: GraphLink[];
   };
   accountId?: string;
+  currentTime?: number;
 }
 
 // Dark theme colors matching the app's green primary palette
@@ -146,6 +151,8 @@ function buildGraph(data: SigmaGraphProps["data"], accountId?: string): Graph {
       color,
       x: (Math.random() - 0.5) * 500,
       y: (Math.random() - 0.5) * 500,
+      firstSeenAt: node.firstSeenAt,
+      deactivatedAt: node.deactivatedAt,
     });
   }
 
@@ -156,13 +163,58 @@ function buildGraph(data: SigmaGraphProps["data"], accountId?: string): Graph {
     graph.addDirectedEdge(link.source, link.target, {
       color: link.isMutual ? COLORS.mutualEdge : COLORS.defaultEdge,
       size: link.isMutual ? 1.5 : 0.5,
+      firstSeenAt: link.firstSeenAt,
+      deactivatedAt: link.deactivatedAt,
     });
   }
 
   return graph;
 }
 
-export default function SigmaGraph({ data, accountId }: SigmaGraphProps) {
+function isVisibleAtTime(
+  firstSeenAt: number | undefined,
+  deactivatedAt: number | null | undefined,
+  currentTime: number,
+): boolean {
+  // No temporal data = always visible
+  if (firstSeenAt === undefined) return true;
+  // Monitored nodes (firstSeenAt === 0) are always visible
+  if (firstSeenAt === 0) return true;
+  return firstSeenAt <= currentTime && (deactivatedAt == null || deactivatedAt > currentTime);
+}
+
+function TimelineFilter({ currentTime }: { currentTime?: number }) {
+  const setSettings = useSetSettings();
+
+  useEffect(() => {
+    if (currentTime === undefined) return;
+
+    setSettings({
+      nodeReducer: (_node, data) => {
+        const attrs = data as Record<string, unknown>;
+        const visible = isVisibleAtTime(
+          attrs.firstSeenAt as number | undefined,
+          attrs.deactivatedAt as number | null | undefined,
+          currentTime,
+        );
+        return { ...data, hidden: !visible };
+      },
+      edgeReducer: (_edge, data) => {
+        const attrs = data as Record<string, unknown>;
+        const visible = isVisibleAtTime(
+          attrs.firstSeenAt as number | undefined,
+          attrs.deactivatedAt as number | null | undefined,
+          currentTime,
+        );
+        return { ...data, type: "arrow" as const, hidden: !visible };
+      },
+    });
+  }, [currentTime, setSettings]);
+
+  return null;
+}
+
+export default function SigmaGraph({ data, accountId, currentTime }: SigmaGraphProps) {
   const graph = useMemo(() => buildGraph(data, accountId), [data, accountId]);
 
   return (
@@ -188,6 +240,7 @@ export default function SigmaGraph({ data, accountId }: SigmaGraphProps) {
         }}
       >
         <ForceAtlas2Layout />
+        <TimelineFilter currentTime={currentTime} />
       </SigmaContainer>
       <Legend />
     </div>

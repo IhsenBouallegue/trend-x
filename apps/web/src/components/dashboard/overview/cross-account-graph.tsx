@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   Card,
@@ -11,6 +12,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useCrossAccountGraph } from "@/hooks/queries/use-social-queries";
+import { TimelineSlider } from "./timeline-slider";
 
 // Sigma components must be loaded client-side (WebGL/DOM required)
 const SigmaGraph = dynamic(
@@ -30,6 +32,24 @@ const LEGEND_COLORS = {
 
 export function CrossAccountGraph() {
   const { data, isLoading } = useCrossAccountGraph();
+  const [currentTime, setCurrentTime] = useState<number | null>(null);
+
+  // Initialize currentTime when data loads
+  const effectiveTime = currentTime ?? data?.timeRange?.max ?? 0;
+
+  const hasTimeline = data?.timeRange != null && data.timeRange.min < data.timeRange.max;
+
+  const visibleCount = useMemo(() => {
+    if (!data || !hasTimeline) return data?.stats.totalShared ?? 0;
+    return data.nodes.filter((n) => {
+      if (n.isMonitored) return false; // don't count monitored nodes
+      if (n.firstSeenAt === 0 || n.firstSeenAt === undefined) return true;
+      return (
+        n.firstSeenAt <= effectiveTime &&
+        (n.deactivatedAt == null || n.deactivatedAt > effectiveTime)
+      );
+    }).length;
+  }, [data, hasTimeline, effectiveTime]);
 
   if (isLoading) {
     return (
@@ -72,12 +92,26 @@ export function CrossAccountGraph() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <SigmaGraph data={data} />
+        <SigmaGraph
+          data={data}
+          currentTime={hasTimeline ? effectiveTime : undefined}
+        />
+
+        {/* Timeline slider */}
+        {hasTimeline && (
+          <TimelineSlider
+            min={data.timeRange.min}
+            max={data.timeRange.max}
+            value={effectiveTime}
+            onChange={setCurrentTime}
+            visibleCount={visibleCount}
+          />
+        )}
 
         {/* Stats line */}
         <p className="text-muted-foreground text-sm">
-          {data.stats.totalShared} shared connection
-          {data.stats.totalShared === 1 ? "" : "s"} across{" "}
+          {visibleCount} shared connection
+          {visibleCount === 1 ? "" : "s"} across{" "}
           {data.stats.totalMonitored} account
           {data.stats.totalMonitored === 1 ? "" : "s"}
         </p>

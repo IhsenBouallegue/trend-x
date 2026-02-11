@@ -39,6 +39,8 @@ export interface StepRecord {
 interface PipelineStepperProps {
   steps: StepRecord[];
   pipelineState: PipelineState | null;
+  jobType?: string;
+  onDismissed?: () => void;
   onCollapse?: () => void;
 }
 
@@ -50,11 +52,23 @@ const stageLabels: Record<string, string> = {
   labeling: "Label",
   detecting: "Detect",
   notifying: "Notify",
+  // Social snapshot stages
+  fetch_followers: "Followers",
+  fetch_following: "Following",
+  diff_connections: "Diff",
+  store_snapshot: "Store",
+};
+
+// Human-readable job type labels
+const jobTypeLabels: Record<string, string> = {
+  profile_update: "Profile Update",
+  social_snapshot: "Social Snapshot",
+  ingest: "Ingest",
 };
 
 const DISMISS_DURATION_MS = 60_000;
 
-export function PipelineStepper({ steps, pipelineState, onCollapse }: PipelineStepperProps) {
+export function PipelineStepper({ steps, pipelineState, jobType, onDismissed, onCollapse }: PipelineStepperProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [dismissProgress, setDismissProgress] = useState(100);
@@ -76,7 +90,7 @@ export function PipelineStepper({ steps, pipelineState, onCollapse }: PipelineSt
         if (remaining > 0) {
           rafRef.current = requestAnimationFrame(tick);
         } else {
-          setIsCollapsed(true);
+          onDismissed ? onDismissed() : setIsCollapsed(true);
         }
       };
       rafRef.current = requestAnimationFrame(tick);
@@ -170,6 +184,11 @@ export function PipelineStepper({ steps, pipelineState, onCollapse }: PipelineSt
           <span className="text-xs font-medium uppercase tracking-wide text-foreground">
             {statusLabel}
           </span>
+          {jobType && (
+            <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5">
+              {jobTypeLabels[jobType] || jobType}
+            </span>
+          )}
         </div>
         {(pipelineState.status === "completed" || pipelineState.status === "failed") && (
           <Button
@@ -342,6 +361,22 @@ function formatStepSummary(stage: string, summary: Record<string, unknown>): str
       const count = summary.notificationCount as number;
       return `${count} sent`;
     }
+    case "fetch_followers": {
+      const count = summary.count as number;
+      return count != null ? `${count} followers` : "done";
+    }
+    case "fetch_following": {
+      const count = summary.count as number;
+      return count != null ? `${count} following` : "done";
+    }
+    case "diff_connections": {
+      const parts: string[] = [];
+      if (summary.added) parts.push(`+${summary.added}`);
+      if (summary.removed) parts.push(`-${summary.removed}`);
+      return parts.length > 0 ? parts.join(", ") : "no changes";
+    }
+    case "store_snapshot":
+      return "saved";
     default:
       return "done";
   }

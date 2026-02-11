@@ -53,6 +53,13 @@ export const queryKeys = {
     metrics: (accountId: string) =>
       [["profile", "getMetrics"], { input: { accountId } }] as const,
   },
+  job: {
+    all: [["job"]] as const,
+    activeRuns: (accountId: string) =>
+      [["job", "getActiveRuns"], { input: { accountId } }] as const,
+    details: (jobId: string) =>
+      [["job", "getDetails"], { input: { jobId } }] as const,
+  },
   social: {
     all: [["social"]] as const,
     snapshotHistory: (accountId: string) =>

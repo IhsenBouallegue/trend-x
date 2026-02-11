@@ -331,16 +331,23 @@ export const socialRouter = router({
     const monitoredAccounts = await db.select().from(account);
 
     if (monitoredAccounts.length === 0) {
-      return { nodes: [], links: [], stats: { totalShared: 0, totalMonitored: 0 } };
+      return {
+        nodes: [],
+        links: [],
+        stats: { totalShared: 0, totalMonitored: 0 },
+        timeRange: { min: 0, max: 0 },
+      };
     }
 
-    // 2. For each account, fetch all active social connections
+    // 2. For each account, fetch ALL social connections (active + inactive)
     type ConnectionInfo = {
       accountId: string;
       userId: string;
       username: string;
       displayName: string;
       direction: string;
+      firstSeenAt: number;
+      deactivatedAt: number | null;
     };
 
     const allConnections: ConnectionInfo[] = [];
@@ -353,14 +360,11 @@ export const socialRouter = router({
           username: socialConnection.username,
           displayName: socialConnection.displayName,
           direction: socialConnection.direction,
+          firstSeenAt: socialConnection.firstSeenAt,
+          deactivatedAt: socialConnection.deactivatedAt,
         })
         .from(socialConnection)
-        .where(
-          and(
-            eq(socialConnection.accountId, acct.id),
-            eq(socialConnection.isActive, 1),
-          ),
-        );
+        .where(eq(socialConnection.accountId, acct.id));
       allConnections.push(...connections);
     }
 
@@ -396,7 +400,29 @@ export const socialRouter = router({
       accountHandleMap.set(acct.id, handle);
     }
 
-    // 5. Build graph nodes and links
+    // 5. Compute per-user temporal data from their connections
+    // For shared nodes: firstSeenAt = min across all connections, deactivatedAt = null if any active, else max
+    const userTemporal = new Map<string, { firstSeenAt: number; deactivatedAt: number | null }>();
+    for (const userId of sharedUserIds) {
+      const userConns = allConnections.filter((c) => c.userId === userId);
+      let minFirst = Infinity;
+      let maxDeactivated = 0;
+      let anyActive = false;
+      for (const c of userConns) {
+        if (c.firstSeenAt < minFirst) minFirst = c.firstSeenAt;
+        if (c.deactivatedAt === null) {
+          anyActive = true;
+        } else if (c.deactivatedAt > maxDeactivated) {
+          maxDeactivated = c.deactivatedAt;
+        }
+      }
+      userTemporal.set(userId, {
+        firstSeenAt: minFirst === Infinity ? 0 : minFirst,
+        deactivatedAt: anyActive ? null : maxDeactivated,
+      });
+    }
+
+    // 6. Build graph nodes and links
     type CrossGraphNode = {
       id: string;
       name: string;
@@ -405,11 +431,15 @@ export const socialRouter = router({
       isMonitored: boolean;
       isShared: boolean;
       sharedWith?: string[];
+      firstSeenAt: number;
+      deactivatedAt: number | null;
     };
     type CrossGraphLink = {
       source: string;
       target: string;
       isMutual: boolean;
+      firstSeenAt: number;
+      deactivatedAt: number | null;
     };
 
     const nodes: CrossGraphNode[] = [];
@@ -425,18 +455,11 @@ export const socialRouter = router({
       }
     }
 
-    // Add monitored account nodes (only those involved in shared connections)
+    // Add monitored account nodes (always visible: firstSeenAt=0, deactivatedAt=null)
     for (const acct of monitoredAccounts) {
       if (!monitoredWithShared.has(acct.id)) continue;
 
       const handle = accountHandleMap.get(acct.id) ?? acct.handle;
-      // Count shared connections for this account
-      let sharedCount = 0;
-      for (const userId of sharedUserIds) {
-        if (userToAccounts.get(userId)!.has(acct.id)) {
-          sharedCount++;
-        }
-      }
 
       nodes.push({
         id: acct.id,
@@ -446,6 +469,8 @@ export const socialRouter = router({
         isMonitored: true,
         isShared: false,
         sharedWith: undefined,
+        firstSeenAt: 0,
+        deactivatedAt: null,
       });
       nodeIds.add(acct.id);
     }
@@ -469,6 +494,8 @@ export const socialRouter = router({
           : 3 + Math.round(((shareCount - 2) / (maxAccounts - 2)) * 5);
       const val = Math.min(8, Math.max(3, scaledVal));
 
+      const temporal = userTemporal.get(userId)!;
+
       nodes.push({
         id: userId,
         name: info.username,
@@ -477,6 +504,8 @@ export const socialRouter = router({
         isMonitored: false,
         isShared: true,
         sharedWith,
+        firstSeenAt: temporal.firstSeenAt,
+        deactivatedAt: temporal.deactivatedAt,
       });
       nodeIds.add(userId);
     }
@@ -490,7 +519,18 @@ export const socialRouter = router({
         source: conn.accountId,
         target: conn.userId,
         isMutual: conn.direction === "mutual",
+        firstSeenAt: conn.firstSeenAt,
+        deactivatedAt: conn.deactivatedAt,
       });
+    }
+
+    // 7. Compute timeRange
+    const now = Math.floor(Date.now() / 1000);
+    let timeMin = now;
+    for (const node of nodes) {
+      if (node.firstSeenAt > 0 && node.firstSeenAt < timeMin) {
+        timeMin = node.firstSeenAt;
+      }
     }
 
     return {
@@ -499,6 +539,10 @@ export const socialRouter = router({
       stats: {
         totalShared: sharedUserIds.size,
         totalMonitored: monitoredWithShared.size,
+      },
+      timeRange: {
+        min: timeMin,
+        max: now,
       },
     };
   }),

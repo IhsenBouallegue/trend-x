@@ -1,6 +1,6 @@
 import { db } from "@trend-x/db";
 import { account, notification, socialConnection } from "@trend-x/db/schema";
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, or } from "drizzle-orm";
 import type { SocialSnapshotResult } from "./social-graph";
 
 // ---------------------------------------------------------------------------
@@ -444,7 +444,7 @@ async function detectNewMutualConnections(
 ): Promise<DetectedSocialChange[]> {
   const changes: DetectedSocialChange[] = [];
 
-  // Get all active follower user IDs for this account
+  // Get active follower user IDs (direction = "follower" or "mutual")
   const activeFollowers = await db
     .select({ userId: socialConnection.userId })
     .from(socialConnection)
@@ -452,6 +452,10 @@ async function detectNewMutualConnections(
       and(
         eq(socialConnection.accountId, accountId),
         eq(socialConnection.isActive, 1),
+        or(
+          eq(socialConnection.direction, "follower"),
+          eq(socialConnection.direction, "mutual"),
+        ),
       ),
     );
 
@@ -478,7 +482,7 @@ async function detectNewMutualConnections(
     }
   }
 
-  // Also check followers added who were already being followed
+  // Also check followers added who were already being followed (direction = "following" or "mutual")
   const activeFollowing = await db
     .select({ userId: socialConnection.userId })
     .from(socialConnection)
@@ -486,6 +490,10 @@ async function detectNewMutualConnections(
       and(
         eq(socialConnection.accountId, accountId),
         eq(socialConnection.isActive, 1),
+        or(
+          eq(socialConnection.direction, "following"),
+          eq(socialConnection.direction, "mutual"),
+        ),
       ),
     );
   const followingUserIds = new Set(activeFollowing.map((f) => f.userId));
