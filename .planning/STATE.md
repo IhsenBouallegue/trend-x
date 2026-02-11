@@ -312,11 +312,12 @@ Recent decisions from PROJECT.md affecting v2.0 work:
 | 006 | Improve header navigation                        | 2026-02-06 | 5077e57 | [006-improve-header-navigation](./quick/006-improve-header-navigation/) |
 | 007 | Generate personality avatar art                  | 2026-02-06 | 0f2d41d | [007-generate-personality-avatar-art](./quick/007-generate-personality-avatar-art/) |
 | 008 | Add cross-account social graph to overview       | 2026-02-11 | c7174c0 | [8-add-a-social-graph-on-the-dashboard-that](./quick/8-add-a-social-graph-on-the-dashboard-that/) |
+| 009 | Add observability, progress tracking, and force-kill | 2026-02-11 | 3346774 | [9-add-observability-progress-tracking-and-](./quick/9-add-observability-progress-tracking-and-/) |
 
 ## Session Continuity
 
-Last session: 2026-02-11 (Quick Task 008 - Cross-Account Social Graph)
-Stopped at: Completed quick-008
+Last session: 2026-02-11 (Quick Task 009 - Observability, Progress Tracking, Force-Kill)
+Stopped at: Completed quick-009
 Resume file: None
 
 **Next action:** Execute 16-05-PLAN.md (next plan in Phase 16)
