@@ -81,7 +81,7 @@ function ForceAtlas2Layout() {
 
 function Legend() {
   return (
-    <div className="absolute bottom-3 left-3 flex flex-col gap-1.5 rounded-md border border-border bg-card/90 px-3 py-2 text-[11px] text-muted-foreground backdrop-blur-sm">
+    <div className="absolute bottom-3 left-3 flex flex-col gap-1.5 rounded-none border border-border bg-card/90 px-3 py-2 text-[11px] text-muted-foreground backdrop-blur-sm">
       <div className="flex items-center gap-2">
         <span
           className="inline-block h-3 w-3 shrink-0 rounded-full"
@@ -218,7 +218,7 @@ export default function SigmaGraph({ data, accountId, currentTime }: SigmaGraphP
   const graph = useMemo(() => buildGraph(data, accountId), [data, accountId]);
 
   return (
-    <div className="relative rounded-md overflow-hidden border border-border">
+    <div className="relative rounded-none overflow-hidden border border-border">
       <SigmaContainer
         graph={graph}
         style={{ height: "400px", width: "100%", background: "transparent" }}

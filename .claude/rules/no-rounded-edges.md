@@ -1,0 +1,10 @@
+---
+paths:
+  - "**/components/**/*.tsx"
+  - "**/components/**/*.css"
+---
+
+# No rounded edges (UI)
+
+- **Social graph**: Do not use rounded edges on the social graph. Use `rounded-none` for the graph container, legend card, and any borders (no `rounded`, `rounded-sm`, `rounded-md`, `rounded-lg`, etc.).
+- **Cards and borders**: Cards and bordered containers in the app should have no rounded edges; use `rounded-none` for cards and borders.
