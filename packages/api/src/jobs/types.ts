@@ -77,6 +77,12 @@ export interface JobContext<TStage extends string> {
   failStage: (stage: TStage, error: string) => Promise<void>;
 
   /**
+   * Update live progress detail text for a running stage.
+   * Writes progressDetail to pipeline_step and lastHeartbeatAt to pipeline_run.
+   */
+  updateProgress: (stage: TStage, detail: string) => Promise<void>;
+
+  /**
    * Check if job was cancelled via pipeline_run.cancelledAt column.
    * If cancelled, updates job status to "cancelled" and returns true.
    * Call this between stages for cooperative cancellation.

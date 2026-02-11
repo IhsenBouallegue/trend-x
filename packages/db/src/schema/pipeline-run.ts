@@ -19,6 +19,7 @@ export const pipelineRun = sqliteTable("pipeline_run", {
     .$defaultFn(() => Math.floor(Date.now() / 1000)),
   completedAt: integer("completed_at"), // null while running
   cancelledAt: integer("cancelled_at"), // for cooperative cancellation, null means not cancelled
+  lastHeartbeatAt: integer("last_heartbeat_at"), // Updated on every progress write and stage transition
   currentStage: text("current_stage"), // denormalized for fast polling, null when queued or completed
   input: text("input"), // JSON string of job input, null for backward compatibility with old rows
   errorMessage: text("error_message"), // populated on failure

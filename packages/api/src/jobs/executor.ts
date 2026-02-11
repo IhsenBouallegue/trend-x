@@ -71,10 +71,10 @@ export async function executeJob(jobId: string): Promise<void> {
 
     setStage: async (stage: string, message: string) => {
       const now = Math.floor(Date.now() / 1000);
-      // Update pipeline_run.currentStage for fast polling
+      // Update pipeline_run.currentStage and heartbeat for fast polling
       await db
         .update(pipelineRun)
-        .set({ currentStage: stage })
+        .set({ currentStage: stage, lastHeartbeatAt: now })
         .where(eq(pipelineRun.id, jobId));
       // Update pipeline_step status to running
       await db
@@ -103,8 +103,15 @@ export async function executeJob(jobId: string): Promise<void> {
           completedAt: now,
           durationMs,
           resultSummary: summary ? JSON.stringify(summary) : null,
+          progressDetail: null, // Clear progress detail on completion
         })
         .where(and(eq(pipelineStep.runId, jobId), eq(pipelineStep.stepName, stage)));
+
+      // Update heartbeat
+      await db
+        .update(pipelineRun)
+        .set({ lastHeartbeatAt: now })
+        .where(eq(pipelineRun.id, jobId));
     },
 
     skipStage: async (stage: string, reason: string) => {
@@ -129,6 +136,20 @@ export async function executeJob(jobId: string): Promise<void> {
           errorMessage: error,
         })
         .where(and(eq(pipelineStep.runId, jobId), eq(pipelineStep.stepName, stage)));
+    },
+
+    updateProgress: async (stage: string, detail: string) => {
+      const now = Math.floor(Date.now() / 1000);
+      // Update progress detail on the step
+      await db
+        .update(pipelineStep)
+        .set({ progressDetail: detail })
+        .where(and(eq(pipelineStep.runId, jobId), eq(pipelineStep.stepName, stage)));
+      // Update heartbeat on the run
+      await db
+        .update(pipelineRun)
+        .set({ lastHeartbeatAt: now })
+        .where(eq(pipelineRun.id, jobId));
     },
 
     checkCancellation: async () => {

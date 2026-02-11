@@ -107,6 +107,10 @@ async function fetchAllPaged(
   userId: string,
   label: string,
   knownIds?: Set<string>,
+  options?: {
+    onProgress?: (detail: string) => Promise<void>;
+    checkCancellation?: () => Promise<boolean>;
+  },
 ): Promise<FetchResult> {
   const allUsers: SocialConnectionData[] = [];
   const seenIds = new Set<string>();
@@ -179,6 +183,15 @@ async function fetchAllPaged(
     cursor = result.nextCursor;
 
     await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
+
+    // Report progress after each page
+    await options?.onProgress?.(`Fetching ${label} page ${page} (${allUsers.length} users so far)`);
+
+    // Check cancellation between pages
+    if (await options?.checkCancellation?.()) {
+      stoppedEarly = true;
+      break;
+    }
   }
 
   return { users: allUsers, stoppedEarly };
@@ -254,6 +267,10 @@ function diffConnections(
 export async function fetchSocialSnapshot(
   accountId: string,
   fullFetch?: boolean,
+  options?: {
+    onProgress?: (detail: string) => Promise<void>;
+    checkCancellation?: () => Promise<boolean>;
+  },
 ): Promise<SocialSnapshotResult> {
   const now = Math.floor(Date.now() / 1000);
 
@@ -318,6 +335,7 @@ export async function fetchSocialSnapshot(
     lookup.userId,
     "following",
     fullFetch ? undefined : knownFollowingIds,
+    options,
   );
   mergeWithPrevious(
     followingResult.users,
@@ -333,6 +351,7 @@ export async function fetchSocialSnapshot(
     lookup.userId,
     "followers",
     fullFetch ? undefined : knownFollowerIds,
+    options,
   );
   mergeWithPrevious(
     followersResult.users,
@@ -389,179 +408,101 @@ export async function fetchSocialSnapshot(
     r.username = previousUsernameMap.get(r.userId) ?? "";
   }
 
-  // h. Update social_connection table
-  // Process following connections
+  // h. Update social_connection table (batched transactions for performance)
+  await options?.onProgress?.("Saving connections to database...");
+
+  // Build connection arrays for batched upserts
+  const followingConnections: Array<{ accountId: string; user: SocialConnectionData; direction: string; now: number }> = [];
   for (const user of followingResult.users) {
     const direction = mutualUserIds.has(user.userId) ? "mutual" : "following";
-    await db
-      .insert(socialConnection)
-      .values({
-        accountId,
-        userId: user.userId,
-        username: user.username,
-        displayName: user.displayName,
-        description: user.description,
-        followerCount: user.followerCount,
-        followingCount: user.followingCount,
-        isBlueVerified: user.isBlueVerified ? 1 : 0,
-        profileImageUrl: user.profileImageUrl,
-        direction,
-        firstSeenAt: now,
-        lastSeenAt: now,
-        isActive: 1,
-      })
-      .onConflictDoUpdate({
-        target: [
-          socialConnection.accountId,
-          socialConnection.userId,
-          socialConnection.direction,
-        ],
-        set: {
-          username: user.username,
-          displayName: user.displayName,
-          description: user.description,
-          followerCount: user.followerCount,
-          followingCount: user.followingCount,
-          isBlueVerified: user.isBlueVerified ? 1 : 0,
-          profileImageUrl: user.profileImageUrl,
-          lastSeenAt: now,
-          isActive: 1,
-          deactivatedAt: null,
-        },
-      });
-
-    // If mutual and previously stored as "following" only, also upsert the "following" record to "mutual"
+    followingConnections.push({ accountId, user, direction, now });
+    // If mutual, also add an explicit mutual direction entry
     if (direction === "mutual") {
-      // Upsert the follower direction too
-      await db
-        .insert(socialConnection)
-        .values({
-          accountId,
-          userId: user.userId,
-          username: user.username,
-          displayName: user.displayName,
-          description: user.description,
-          followerCount: user.followerCount,
-          followingCount: user.followingCount,
-          isBlueVerified: user.isBlueVerified ? 1 : 0,
-          profileImageUrl: user.profileImageUrl,
-          direction: "mutual",
-          firstSeenAt: now,
-          lastSeenAt: now,
-          isActive: 1,
-        })
-        .onConflictDoUpdate({
-          target: [
-            socialConnection.accountId,
-            socialConnection.userId,
-            socialConnection.direction,
-          ],
-          set: {
-            username: user.username,
-            displayName: user.displayName,
-            lastSeenAt: now,
-            isActive: 1,
-            deactivatedAt: null,
-          },
-        });
+      followingConnections.push({ accountId, user, direction: "mutual", now });
     }
   }
 
-  // Process follower-only connections (not mutual, those handled above)
+  const followerConnections: Array<{ accountId: string; user: SocialConnectionData; direction: string; now: number }> = [];
   for (const user of followersResult.users) {
     if (mutualUserIds.has(user.userId)) continue; // Already handled as mutual
+    followerConnections.push({ accountId, user, direction: "follower", now });
+  }
 
-    await db
-      .insert(socialConnection)
-      .values({
-        accountId,
-        userId: user.userId,
-        username: user.username,
-        displayName: user.displayName,
-        description: user.description,
-        followerCount: user.followerCount,
-        followingCount: user.followingCount,
-        isBlueVerified: user.isBlueVerified ? 1 : 0,
-        profileImageUrl: user.profileImageUrl,
-        direction: "follower",
-        firstSeenAt: now,
-        lastSeenAt: now,
-        isActive: 1,
-      })
-      .onConflictDoUpdate({
-        target: [
-          socialConnection.accountId,
-          socialConnection.userId,
-          socialConnection.direction,
-        ],
-        set: {
-          username: user.username,
-          displayName: user.displayName,
-          description: user.description,
-          followerCount: user.followerCount,
-          followingCount: user.followingCount,
-          isBlueVerified: user.isBlueVerified ? 1 : 0,
-          profileImageUrl: user.profileImageUrl,
-          lastSeenAt: now,
-          isActive: 1,
-          deactivatedAt: null,
-        },
+  const allConnections = [...followingConnections, ...followerConnections];
+  const totalConnections = allConnections.length;
+
+  // Batch upsert all connections
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < allConnections.length; i += BATCH_SIZE) {
+    const batch = allConnections.slice(i, i + BATCH_SIZE);
+    await db.transaction(async (tx) => {
+      for (const item of batch) {
+        await tx
+          .insert(socialConnection)
+          .values({
+            accountId: item.accountId,
+            userId: item.user.userId,
+            username: item.user.username,
+            displayName: item.user.displayName,
+            description: item.user.description,
+            followerCount: item.user.followerCount,
+            followingCount: item.user.followingCount,
+            isBlueVerified: item.user.isBlueVerified ? 1 : 0,
+            profileImageUrl: item.user.profileImageUrl,
+            direction: item.direction,
+            firstSeenAt: item.now,
+            lastSeenAt: item.now,
+            isActive: 1,
+          })
+          .onConflictDoUpdate({
+            target: [
+              socialConnection.accountId,
+              socialConnection.userId,
+              socialConnection.direction,
+            ],
+            set: {
+              username: item.user.username,
+              displayName: item.user.displayName,
+              description: item.user.description,
+              followerCount: item.user.followerCount,
+              followingCount: item.user.followingCount,
+              isBlueVerified: item.user.isBlueVerified ? 1 : 0,
+              profileImageUrl: item.user.profileImageUrl,
+              lastSeenAt: item.now,
+              isActive: 1,
+              deactivatedAt: null,
+            },
+          });
+      }
+    });
+    await options?.onProgress?.(`Saved ${Math.min(i + BATCH_SIZE, totalConnections)}/${totalConnections} connections`);
+  }
+
+  // Deactivate removed connections (batched)
+  const allRemovedIds = [
+    ...followingDiff.removed.map((r) => ({ userId: r.userId, directions: ["following", "mutual"] })),
+    ...followersDiff.removed.map((r) => ({ userId: r.userId, directions: ["follower", "mutual"] })),
+  ];
+
+  if (allRemovedIds.length > 0) {
+    for (let i = 0; i < allRemovedIds.length; i += BATCH_SIZE) {
+      const batch = allRemovedIds.slice(i, i + BATCH_SIZE);
+      await db.transaction(async (tx) => {
+        for (const item of batch) {
+          for (const direction of item.directions) {
+            await tx
+              .update(socialConnection)
+              .set({ isActive: 0, deactivatedAt: now })
+              .where(
+                and(
+                  eq(socialConnection.accountId, accountId),
+                  eq(socialConnection.userId, item.userId),
+                  eq(socialConnection.direction, direction),
+                ),
+              );
+          }
+        }
       });
-  }
-
-  // Deactivate removed connections
-  const allRemovedFollowingIds = followingDiff.removed.map((r) => r.userId);
-  if (allRemovedFollowingIds.length > 0) {
-    // Deactivate following direction for removed users
-    for (const removedId of allRemovedFollowingIds) {
-      await db
-        .update(socialConnection)
-        .set({ isActive: 0, deactivatedAt: now })
-        .where(
-          and(
-            eq(socialConnection.accountId, accountId),
-            eq(socialConnection.userId, removedId),
-            eq(socialConnection.direction, "following"),
-          ),
-        );
-      // Also deactivate mutual direction if it existed
-      await db
-        .update(socialConnection)
-        .set({ isActive: 0, deactivatedAt: now })
-        .where(
-          and(
-            eq(socialConnection.accountId, accountId),
-            eq(socialConnection.userId, removedId),
-            eq(socialConnection.direction, "mutual"),
-          ),
-        );
-    }
-  }
-
-  const allRemovedFollowerIds = followersDiff.removed.map((r) => r.userId);
-  if (allRemovedFollowerIds.length > 0) {
-    for (const removedId of allRemovedFollowerIds) {
-      await db
-        .update(socialConnection)
-        .set({ isActive: 0, deactivatedAt: now })
-        .where(
-          and(
-            eq(socialConnection.accountId, accountId),
-            eq(socialConnection.userId, removedId),
-            eq(socialConnection.direction, "follower"),
-          ),
-        );
-      // Also deactivate mutual direction if it existed
-      await db
-        .update(socialConnection)
-        .set({ isActive: 0, deactivatedAt: now })
-        .where(
-          and(
-            eq(socialConnection.accountId, accountId),
-            eq(socialConnection.userId, removedId),
-            eq(socialConnection.direction, "mutual"),
-          ),
-        );
     }
   }
 

@@ -19,5 +19,6 @@ export const pipelineStep = sqliteTable("pipeline_step", {
   completedAt: integer("completed_at"),
   durationMs: integer("duration_ms"), // computed on completion as (completedAt - startedAt) * 1000, null while running/pending
   resultSummary: text("result_summary"), // JSON: e.g., '{"tweetCount": 142}'
+  progressDetail: text("progress_detail"), // Live progress text e.g. "Fetching following page 3 (450 users)"
   errorMessage: text("error_message"),
 });

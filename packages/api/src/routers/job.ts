@@ -60,10 +60,47 @@ export const jobRouter = router({
         .where(eq(pipelineStep.runId, input.jobId))
         .orderBy(pipelineStep.stepOrder);
 
+      const STALE_THRESHOLD_SEC = 300;
+      const nowSec = Math.floor(Date.now() / 1000);
+
       return {
         ...run,
         steps,
+        isStale:
+          run.status === "running" && run.lastHeartbeatAt != null
+            ? nowSec - run.lastHeartbeatAt > STALE_THRESHOLD_SEC
+            : false,
       };
+    }),
+
+  /**
+   * Force-kill a running job immediately (marks as failed, not cooperative).
+   * The executor may continue running until it next calls checkCancellation,
+   * but the frontend will see "failed" immediately.
+   */
+  forceKill: publicProcedure
+    .input(z.object({ jobId: z.string() }))
+    .mutation(async ({ input }) => {
+      const now = Math.floor(Date.now() / 1000);
+      // Immediately mark as failed
+      await db
+        .update(pipelineRun)
+        .set({
+          status: "failed",
+          errorMessage: "Force killed by user",
+          completedAt: now,
+        })
+        .where(eq(pipelineRun.id, input.jobId));
+      // Mark any running steps as failed
+      await db
+        .update(pipelineStep)
+        .set({
+          status: "failed",
+          errorMessage: "Force killed by user",
+          completedAt: now,
+        })
+        .where(and(eq(pipelineStep.runId, input.jobId), eq(pipelineStep.status, "running")));
+      return { success: true };
     }),
 
   /**
@@ -173,6 +210,9 @@ export const jobRouter = router({
         )
         .orderBy(desc(pipelineRun.startedAt));
 
+      const STALE_THRESHOLD_SEC = 300; // 5 minutes
+      const nowSec = Math.floor(Date.now() / 1000);
+
       const runsWithSteps = await Promise.all(
         runs.map(async (run) => {
           const steps = await db
@@ -181,7 +221,14 @@ export const jobRouter = router({
             .where(eq(pipelineStep.runId, run.id))
             .orderBy(pipelineStep.stepOrder);
 
-          return { ...run, steps };
+          return {
+            ...run,
+            steps,
+            isStale:
+              run.status === "running" && run.lastHeartbeatAt != null
+                ? nowSec - run.lastHeartbeatAt > STALE_THRESHOLD_SEC
+                : false,
+          };
         }),
       );
 

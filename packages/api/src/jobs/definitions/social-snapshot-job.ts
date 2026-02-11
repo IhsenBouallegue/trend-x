@@ -64,6 +64,10 @@ defineJob<SocialSnapshotInput, SocialSnapshotStage>({
     const snapshotResult = await fetchSocialSnapshot(
       input.accountId,
       input.fullFetch,
+      {
+        onProgress: (detail) => context.updateProgress("fetching", detail),
+        checkCancellation: () => context.checkCancellation(),
+      },
     );
 
     await context.completeStage("fetching", {
