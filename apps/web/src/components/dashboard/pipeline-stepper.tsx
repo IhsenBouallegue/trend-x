@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronUp, SkipForward } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronUp, SkipForward, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -34,12 +34,15 @@ export interface StepRecord {
   completedAt?: number;
   summary?: Record<string, unknown>;
   error?: string;
+  progressDetail?: string;
 }
 
 interface PipelineStepperProps {
   steps: StepRecord[];
   pipelineState: PipelineState | null;
   jobType?: string;
+  isStale?: boolean;
+  onForceKill?: () => void;
   onDismissed?: () => void;
   onCollapse?: () => void;
 }
@@ -53,6 +56,8 @@ const stageLabels: Record<string, string> = {
   detecting: "Detect",
   notifying: "Notify",
   // Social snapshot stages
+  processing: "Process",
+  completing: "Complete",
   fetch_followers: "Followers",
   fetch_following: "Following",
   diff_connections: "Diff",
@@ -68,7 +73,25 @@ const jobTypeLabels: Record<string, string> = {
 
 const DISMISS_DURATION_MS = 60_000;
 
-export function PipelineStepper({ steps, pipelineState, jobType, onDismissed, onCollapse }: PipelineStepperProps) {
+function ElapsedTime({ startedAt }: { startedAt?: number }) {
+  const [elapsed, setElapsed] = useState("");
+  useEffect(() => {
+    if (!startedAt) return;
+    const tick = () => {
+      const seconds = Math.floor(Date.now() / 1000) - startedAt;
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      setElapsed(mins > 0 ? `${mins}m ${secs}s` : `${secs}s`);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [startedAt]);
+  if (!startedAt || !elapsed) return null;
+  return <span className="text-[10px] text-muted-foreground ml-1">({elapsed})</span>;
+}
+
+export function PipelineStepper({ steps, pipelineState, jobType, isStale, onForceKill, onDismissed, onCollapse }: PipelineStepperProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [dismissProgress, setDismissProgress] = useState(100);
@@ -241,7 +264,15 @@ export function PipelineStepper({ steps, pipelineState, jobType, onDismissed, on
               >
                 {stageLabels[step.stage] || step.stage}
               </span>
+              {step.status === "running" && (
+                <ElapsedTime startedAt={step.startedAt} />
+              )}
             </div>
+            {step.status === "running" && step.progressDetail && (
+              <p className="text-[10px] text-primary/70 truncate">
+                {step.progressDetail}
+              </p>
+            )}
             {step.status === "completed" && step.summary && (
               <p className="text-[10px] text-muted-foreground truncate">
                 {formatStepSummary(step.stage, step.summary)}
@@ -274,6 +305,27 @@ export function PipelineStepper({ steps, pipelineState, jobType, onDismissed, on
           <p className="text-xs text-destructive">
             {getDescriptionText(pipelineState, steps)}
           </p>
+        </div>
+      )}
+
+      {/* Stale warning with force-kill button */}
+      {isStale && pipelineState.status === "running" && (
+        <div className="mt-2 flex items-center justify-between bg-destructive/10 border border-destructive/20 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+            <span className="text-xs text-destructive">Pipeline appears stuck (no heartbeat for 5+ minutes)</span>
+          </div>
+          {onForceKill && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={onForceKill}
+              className="h-6 px-2 text-xs"
+            >
+              <XCircle className="mr-1 h-3 w-3" />
+              Force Kill
+            </Button>
+          )}
         </div>
       )}
     </div>

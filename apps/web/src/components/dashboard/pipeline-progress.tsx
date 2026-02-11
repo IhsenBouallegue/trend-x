@@ -1,7 +1,11 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useAccount } from "@/contexts/account-context";
 import { useActiveJobs, useTelegramStatus } from "@/hooks/queries";
+import { queryKeys } from "@/hooks/queries/query-keys";
+import { trpc } from "@/utils/trpc";
 import { PipelineStepper } from "./pipeline-stepper";
 import type { PipelineState, PipelineStage, StepRecord } from "./pipeline-stepper";
 
@@ -9,6 +13,19 @@ export function PipelineProgress() {
   const { selectedAccountId } = useAccount();
   const { allVisibleJobs, dismissCompleted } = useActiveJobs(selectedAccountId);
   const { data: telegramStatus } = useTelegramStatus();
+  const queryClient = useQueryClient();
+
+  const forceKillMutation = useMutation(
+    trpc.job.forceKill.mutationOptions({
+      onSuccess: () => {
+        toast.success("Job force killed");
+        queryClient.invalidateQueries({ queryKey: queryKeys.job.all });
+      },
+      onError: (error: { message: string }) => {
+        toast.error(error?.message || "Failed to force kill job");
+      },
+    }),
+  );
 
   if (allVisibleJobs.length === 0) return null;
 
@@ -29,6 +46,8 @@ export function PipelineProgress() {
             steps={steps}
             pipelineState={pipelineState}
             jobType={job.pipelineType}
+            isStale={job.isStale ?? false}
+            onForceKill={() => forceKillMutation.mutate({ jobId: job.id })}
             onDismissed={() => dismissCompleted(job.id)}
           />
         );
@@ -106,6 +125,7 @@ function mapJobStepsToStepRecords(
     completedAt: number | null;
     resultSummary: string | null;
     errorMessage: string | null;
+    progressDetail: string | null;
   }>
 ): StepRecord[] {
   return steps.map((step) => {
@@ -125,6 +145,7 @@ function mapJobStepsToStepRecords(
       completedAt: step.completedAt ?? undefined,
       summary,
       error: step.errorMessage ?? undefined,
+      progressDetail: step.progressDetail ?? undefined,
     };
   });
 }
