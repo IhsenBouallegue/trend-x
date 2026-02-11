@@ -212,8 +212,13 @@ export const socialRouter = router({
         monitoredHandleMap.set(handle, acct.id);
       }
 
-      // Add monitored accounts as nodes
-      for (const acct of monitoredAccounts) {
+      // When filtering by account, only seed that account as a node.
+      // Other monitored accounts appear only if they are connections.
+      const seedAccounts = input.accountId
+        ? monitoredAccounts.filter((a) => a.id === input.accountId)
+        : monitoredAccounts;
+
+      for (const acct of seedAccounts) {
         const handle = acct.handle.startsWith("@")
           ? acct.handle.slice(1)
           : acct.handle;
@@ -228,10 +233,8 @@ export const socialRouter = router({
         nodeIds.add(acct.id);
       }
 
-      // For each monitored account, get active connections
-      const accountFilter = input.accountId
-        ? monitoredAccounts.filter((a) => a.id === input.accountId)
-        : monitoredAccounts;
+      // For each seed account, get active connections
+      const accountFilter = seedAccounts;
 
       for (const acct of accountFilter) {
         const connections = await db
@@ -251,6 +254,26 @@ export const socialRouter = router({
           );
 
           if (monitoredId) {
+            // Add the connected monitored account as a node if not present
+            if (!nodeIds.has(monitoredId)) {
+              const connAcct = monitoredAccounts.find(
+                (a) => a.id === monitoredId,
+              );
+              if (connAcct) {
+                const connHandle = connAcct.handle.startsWith("@")
+                  ? connAcct.handle.slice(1)
+                  : connAcct.handle;
+                nodes.push({
+                  id: monitoredId,
+                  name: connHandle,
+                  val: 10,
+                  color: "#3b82f6",
+                  isMonitored: true,
+                });
+                nodeIds.add(monitoredId);
+              }
+            }
+
             // Link between monitored accounts
             const isMutual = conn.direction === "mutual";
             const linkKey = [acct.id, monitoredId].sort().join("-");
@@ -298,6 +321,187 @@ export const socialRouter = router({
 
       return { nodes, links };
     }),
+
+  /**
+   * Get cross-account social graph showing shared connections between all monitored accounts.
+   * Only returns connections that appear for 2+ monitored accounts.
+   */
+  getCrossAccountGraph: publicProcedure.query(async () => {
+    // 1. Fetch all monitored accounts
+    const monitoredAccounts = await db.select().from(account);
+
+    if (monitoredAccounts.length === 0) {
+      return { nodes: [], links: [], stats: { totalShared: 0, totalMonitored: 0 } };
+    }
+
+    // 2. For each account, fetch all active social connections
+    type ConnectionInfo = {
+      accountId: string;
+      userId: string;
+      username: string;
+      displayName: string;
+      direction: string;
+    };
+
+    const allConnections: ConnectionInfo[] = [];
+
+    for (const acct of monitoredAccounts) {
+      const connections = await db
+        .select({
+          accountId: socialConnection.accountId,
+          userId: socialConnection.userId,
+          username: socialConnection.username,
+          displayName: socialConnection.displayName,
+          direction: socialConnection.direction,
+        })
+        .from(socialConnection)
+        .where(
+          and(
+            eq(socialConnection.accountId, acct.id),
+            eq(socialConnection.isActive, 1),
+          ),
+        );
+      allConnections.push(...connections);
+    }
+
+    // 3. Build map: userId -> Set<accountId>
+    const userToAccounts = new Map<string, Set<string>>();
+    const userInfo = new Map<string, { username: string; displayName: string }>();
+
+    for (const conn of allConnections) {
+      if (!userToAccounts.has(conn.userId)) {
+        userToAccounts.set(conn.userId, new Set());
+        userInfo.set(conn.userId, {
+          username: conn.username,
+          displayName: conn.displayName,
+        });
+      }
+      userToAccounts.get(conn.userId)!.add(conn.accountId);
+    }
+
+    // 4. Shared connections = those appearing for 2+ monitored accounts
+    const sharedUserIds = new Set<string>();
+    for (const [userId, accountIds] of userToAccounts) {
+      if (accountIds.size >= 2) {
+        sharedUserIds.add(userId);
+      }
+    }
+
+    // Build account handle lookup
+    const accountHandleMap = new Map<string, string>();
+    for (const acct of monitoredAccounts) {
+      const handle = acct.handle.startsWith("@")
+        ? acct.handle.slice(1)
+        : acct.handle;
+      accountHandleMap.set(acct.id, handle);
+    }
+
+    // 5. Build graph nodes and links
+    type CrossGraphNode = {
+      id: string;
+      name: string;
+      val: number;
+      color: string;
+      isMonitored: boolean;
+      isShared: boolean;
+      sharedWith?: string[];
+    };
+    type CrossGraphLink = {
+      source: string;
+      target: string;
+      isMutual: boolean;
+    };
+
+    const nodes: CrossGraphNode[] = [];
+    const links: CrossGraphLink[] = [];
+    const nodeIds = new Set<string>();
+
+    // Determine which monitored accounts have shared connections
+    const monitoredWithShared = new Set<string>();
+    for (const userId of sharedUserIds) {
+      const accountIds = userToAccounts.get(userId)!;
+      for (const accountId of accountIds) {
+        monitoredWithShared.add(accountId);
+      }
+    }
+
+    // Add monitored account nodes (only those involved in shared connections)
+    for (const acct of monitoredAccounts) {
+      if (!monitoredWithShared.has(acct.id)) continue;
+
+      const handle = accountHandleMap.get(acct.id) ?? acct.handle;
+      // Count shared connections for this account
+      let sharedCount = 0;
+      for (const userId of sharedUserIds) {
+        if (userToAccounts.get(userId)!.has(acct.id)) {
+          sharedCount++;
+        }
+      }
+
+      nodes.push({
+        id: acct.id,
+        name: handle,
+        val: 10,
+        color: "#4ade80",
+        isMonitored: true,
+        isShared: false,
+        sharedWith: undefined,
+      });
+      nodeIds.add(acct.id);
+    }
+
+    // Add shared connection nodes
+    for (const userId of sharedUserIds) {
+      const info = userInfo.get(userId);
+      if (!info) continue;
+
+      const accountIds = userToAccounts.get(userId)!;
+      const sharedWith = Array.from(accountIds).map(
+        (id) => accountHandleMap.get(id) ?? id,
+      );
+
+      // Scale val 3-8 based on how many accounts share this connection
+      const shareCount = accountIds.size;
+      const maxAccounts = monitoredAccounts.length;
+      const scaledVal =
+        maxAccounts <= 2
+          ? 5
+          : 3 + Math.round(((shareCount - 2) / (maxAccounts - 2)) * 5);
+      const val = Math.min(8, Math.max(3, scaledVal));
+
+      nodes.push({
+        id: userId,
+        name: info.username,
+        val,
+        color: "#f59e0b",
+        isMonitored: false,
+        isShared: true,
+        sharedWith,
+      });
+      nodeIds.add(userId);
+    }
+
+    // Add links: one per (monitoredAccount -> sharedConnection) pair
+    for (const conn of allConnections) {
+      if (!sharedUserIds.has(conn.userId)) continue;
+      if (!nodeIds.has(conn.accountId) || !nodeIds.has(conn.userId)) continue;
+
+      links.push({
+        source: conn.accountId,
+        target: conn.userId,
+        isMutual: conn.direction === "mutual",
+      });
+    }
+
+    return {
+      nodes,
+      links,
+      stats: {
+        totalShared: sharedUserIds.size,
+        totalMonitored: monitoredWithShared.size,
+      },
+    };
+  }),
 
   /**
    * Get summary stats for an account's social connections.

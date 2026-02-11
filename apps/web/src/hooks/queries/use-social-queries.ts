@@ -70,6 +70,13 @@ export function useSocialGraph(accountId?: string | null) {
   });
 }
 
+export function useCrossAccountGraph() {
+  return useQuery({
+    ...trpc.social.getCrossAccountGraph.queryOptions(),
+    staleTime: 60_000,
+  });
+}
+
 export function useSocialStats(accountId: string | null) {
   return useQuery({
     ...trpc.social.getStats.queryOptions({
