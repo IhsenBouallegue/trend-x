@@ -18,6 +18,7 @@ import {
   useOverviewMetrics,
   useRecentActivity,
 } from "@/hooks/queries";
+import { CrossAccountGraph } from "./cross-account-graph";
 
 const chartConfig = {
   count: {
@@ -225,6 +226,18 @@ export function OverviewDashboard() {
         ) : (
           <ActivityLog entries={globalActivity ?? []} maxHeight="300px" />
         )}
+      </section>
+
+      {/* Social Overlap */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="font-semibold text-xl">Social Overlap</h2>
+          <p className="mt-1 text-muted-foreground text-sm">
+            Connections shared between monitored accounts
+          </p>
+        </div>
+
+        <CrossAccountGraph />
       </section>
     </div>
   );
