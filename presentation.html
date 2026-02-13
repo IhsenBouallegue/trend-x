@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrendX — From Prototype to Production</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+<style>
+  @font-face {
+    font-family: "Geist Mono";
+    src: url("https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-mono/GeistMono-Variable.woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  /* ── TrendX Design Tokens (from index.css dark mode) ── */
+  :root {
+    /* Backgrounds */
+    --bg:             oklch(0.145 0 0);
+    --card:           oklch(0.205 0 0);
+    --muted-bg:       oklch(0.269 0 0);
+    --accent-bg:      oklch(0.371 0 0);
+
+    /* Foregrounds */
+    --fg:             oklch(0.985 0 0);
+    --fg-muted:       oklch(0.708 0 0);
+    --fg-dim:         oklch(0.556 0 0);
+
+    /* Primary — green palette from TrendX chart colors */
+    --primary:        oklch(0.77 0.20 131);   /* chart-3 — main accent */
+    --primary-fg:     oklch(0.27 0.07 132);
+
+    /* Chart gradient (bright → dark green) */
+    --chart-1:        oklch(0.90 0.18 127);   /* brightest */
+    --chart-2:        oklch(0.85 0.21 129);
+    --chart-3:        oklch(0.77 0.20 131);   /* = primary */
+    --chart-4:        oklch(0.65 0.18 132);
+    --chart-5:        oklch(0.53 0.14 132);   /* deepest */
+
+    /* Borders */
+    --border:         oklch(1 0 0 / 10%);
+    --border-input:   oklch(1 0 0 / 15%);
+
+    /* Semantic */
+    --destructive:    oklch(0.704 0.191 22.216);
+    --amber:          oklch(0.795 0.155 85);
+
+    /* Radius — sharp edges */
+    --radius:         0;
+  }
+
+  /* ── Global ── */
+  .reveal {
+    font-family: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 21px;
+    color: var(--fg);
+    background: var(--bg);
+  }
+  .reveal .slides > section,
+  .reveal .slides > section > section {
+    background: transparent;
+    padding: 30px 40px;
+    box-sizing: border-box;
+  }
+  .reveal h1, .reveal h2, .reveal h3 {
+    font-family: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  .reveal h1 { font-size: 2.4em; color: var(--fg); }
+  .reveal h2 { font-size: 1.5em; color: var(--fg); margin-bottom: 0.4em; }
+  .reveal h3 { font-size: 1em; color: var(--primary); margin-bottom: 0.25em; }
+  .reveal p, .reveal li { line-height: 1.45; }
+  .reveal section { text-align: left; }
+  .reveal ul { list-style: none; padding-left: 0; margin: 0; }
+  .reveal ul li { position: relative; padding-left: 1.3em; margin-bottom: 0.25em; }
+  .reveal ul li::before {
+    content: ">";
+    position: absolute;
+    left: 0;
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 0.9em;
+  }
+  .reveal .slides { width: 1100px !important; }
+
+  /* ── Utility ── */
+  .accent  { color: var(--primary); }
+  .accent2 { color: var(--chart-1); }
+  .accent3 { color: var(--chart-5); }
+  .muted   { color: var(--fg-muted); font-size: 0.82em; }
+  .tag {
+    display: inline-block;
+    padding: 0.15em 0.55em;
+    border-radius: calc(var(--radius) - 4px);
+    font-size: 0.7em;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin-right: 0.3em;
+    vertical-align: middle;
+  }
+  .tag-primary { background: oklch(0.77 0.20 131 / 12%); color: var(--primary); border: 1px solid oklch(0.77 0.20 131 / 22%); }
+  .tag-bright  { background: oklch(0.90 0.18 127 / 12%); color: var(--chart-1); border: 1px solid oklch(0.90 0.18 127 / 22%); }
+  .tag-deep    { background: oklch(0.53 0.14 132 / 15%); color: var(--chart-4); border: 1px solid oklch(0.53 0.14 132 / 25%); }
+  .tag-green   { background: oklch(0.77 0.20 131 / 12%); color: var(--chart-2); border: 1px solid oklch(0.77 0.20 131 / 22%); }
+  .tag-amber   { background: oklch(0.795 0.155 85 / 12%); color: var(--amber); border: 1px solid oklch(0.795 0.155 85 / 22%); }
+  .tag-red     { background: oklch(0.704 0.191 22 / 12%); color: var(--destructive); border: 1px solid oklch(0.704 0.191 22 / 22%); }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.6em 0.9em;
+    margin-bottom: 0.5em;
+  }
+  .card h3 { margin-top: 0; }
+
+  /* ── Grid ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5em; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5em; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.5em; }
+
+  /* ── Stats row ── */
+  .stat {
+    text-align: center;
+    padding: 0.45em 0.3em;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .stat .num {
+    font-size: 1.6em;
+    font-weight: 800;
+    display: block;
+    line-height: 1.1;
+  }
+  .stat .label {
+    font-size: 0.6em;
+    color: var(--fg-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 0.2em;
+    display: block;
+  }
+
+  /* ── Flow diagram ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: wrap;
+    margin: 0.6em 0;
+  }
+  .flow .step {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.4em 0.7em;
+    font-size: 0.75em;
+    font-weight: 600;
+    text-align: center;
+    min-width: 110px;
+  }
+  .flow .arrow {
+    color: var(--primary);
+    font-size: 1.2em;
+    padding: 0 0.25em;
+    flex-shrink: 0;
+  }
+
+  /* ── Table ── */
+  .reveal table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.75em;
+    margin-top: 0.4em;
+  }
+  .reveal table th {
+    background: oklch(0.77 0.20 131 / 8%);
+    color: var(--primary);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.5em 0.7em;
+    border-bottom: 1px solid var(--border);
+  }
+  .reveal table td {
+    padding: 0.45em 0.7em;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .reveal table tr:last-child td { border-bottom: none; }
+
+  /* ── Diagram boxes ── */
+  .arch-box {
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.5em 0.7em;
+    text-align: center;
+    font-size: 0.8em;
+    font-weight: 600;
+    position: relative;
+  }
+  .arch-box.layer-1 { border-color: var(--chart-1); background: oklch(0.90 0.18 127 / 6%); }
+  .arch-box.layer-2 { border-color: var(--chart-3); background: oklch(0.77 0.20 131 / 6%); }
+  .arch-box.layer-3 { border-color: var(--chart-5); background: oklch(0.53 0.14 132 / 6%); }
+  .arch-box small    { display: block; font-weight: 400; color: var(--fg-muted); font-size: 0.85em; }
+
+  /* ── Title slide ── */
+  .title-slide h1 {
+    font-size: 2.8em;
+    margin-bottom: 0.1em;
+    background: linear-gradient(135deg, var(--chart-1), var(--chart-3), var(--chart-5));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .title-slide .subtitle {
+    font-size: 1em;
+    color: var(--fg-muted);
+    margin-bottom: 1.8em;
+  }
+  .title-slide .author {
+    font-size: 0.85em;
+    color: var(--fg-dim);
+  }
+  .title-slide .author strong {
+    color: var(--fg);
+    font-weight: 600;
+  }
+
+  /* ── Section divider ── */
+  .section-divider { text-align: center !important; }
+  .section-divider h2 {
+    font-size: 2em;
+    background: linear-gradient(135deg, var(--chart-1), var(--chart-5));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .section-divider p {
+    color: var(--fg-muted);
+    font-size: 1em;
+    text-align: center;
+  }
+
+  /* ── Progress indicator ── */
+  .reveal .progress { height: 3px; color: var(--primary); }
+
+  /* ── Slide numbers ── */
+  .reveal .slide-number { font-size: 0.55em; color: var(--fg-dim); font-family: "Geist Mono", monospace; }
+
+  /* ── Footer ── */
+  .slide-footer {
+    position: fixed;
+    bottom: 16px;
+    left: 40px;
+    font-size: 0.5em;
+    color: oklch(1 0 0 / 18%);
+    letter-spacing: 0.06em;
+    font-family: "Geist Mono", monospace;
+  }
+
+  /* ── Code-like emphasis ── */
+  .reveal code, .mono {
+    font-family: "Geist Mono", monospace;
+    font-size: 0.9em;
+    background: var(--muted-bg);
+    padding: 0.1em 0.35em;
+    border-radius: calc(var(--radius) - 4px);
+    color: var(--chart-2);
+  }
+
+  /* ── Terminal prompt aesthetic for bullet leader ── */
+  .reveal ul li::before {
+    content: ">";
+    font-family: "Geist Mono", monospace;
+  }
+
+  /* ── Override reveal.js background ── */
+  .reveal,
+  .reveal .slide-background {
+    background: var(--bg);
+  }
+
+  /* ── Screenshot placeholder ── */
+  .screenshot-placeholder {
+    background: oklch(0.18 0 0);
+    border: 1.5px dashed oklch(0.77 0.20 131 / 30%);
+    border-radius: var(--radius);
+    padding: 1.5em 1em;
+    text-align: center;
+    color: var(--fg-dim);
+    font-size: 0.75em;
+    font-style: italic;
+    margin: 0.4em 0;
+  }
+
+  /* ── Emphasis quote card ── */
+  .quote-card {
+    background: oklch(0.77 0.20 131 / 5%);
+    border-left: 3px solid var(--primary);
+    padding: 0.5em 0.9em;
+    margin: 0.5em 0;
+    font-size: 0.88em;
+    font-style: italic;
+    color: var(--fg-muted);
+  }
+  .quote-card strong { color: var(--fg); font-style: normal; }
+
+  /* ── Cost slide styles ── */
+  .cost-big { font-size: 2.2em; font-weight: 800; line-height: 1; }
+  .cost-unit { font-size: 0.7em; color: var(--fg-muted); display: block; margin-top: 0.15em; }
+  .cost-detail { font-size: 0.6em; color: var(--fg-dim); display: block; margin-top: 0.1em; }
+  .scenario-banner {
+    border: 1.5px solid var(--primary);
+    background: oklch(0.77 0.20 131 / 5%);
+    padding: 0.35em 0.8em;
+    text-align: center;
+    font-size: 0.85em;
+    margin: 0.5em 0 0.4em;
+  }
+  .footnotes { font-size: 0.55em; color: oklch(0.45 0 0); line-height: 1.7; margin-top: 0.4em; }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 1 — Title
+     ═══════════════════════════════════════════════════════════════ -->
+<section class="title-slide" data-background-color="oklch(0.145 0 0)" data-background-gradient="radial-gradient(ellipse at 30% 60%, oklch(0.77 0.20 131 / 6%), transparent 55%), radial-gradient(ellipse at 70% 30%, oklch(0.53 0.14 132 / 5%), transparent 50%)">
+  <h1>TrendX</h1>
+  <p class="subtitle">From Prototype to Production</p>
+  <p class="author">
+    <strong>Ihsen Bouallegue</strong> · Technical Architect & Part-time code whisperer<br>
+    <span style="color:var(--fg-dim); font-size:0.85em;">February 2026</span>
+  </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 2 — Where We Are (30-second recap)
+     ═══════════════════════════════════════════════════════════════ -->
+<section data-background-color="oklch(0.145 0 0)">
+  <h2>Where We Are Today</h2>
+
+  <div class="flow" style="margin-bottom:0.6em;">
+    <div class="step" style="border-color:var(--chart-1);">Monitor<br>Accounts</div>
+    <div class="arrow">→</div>
+    <div class="step" style="border-color:var(--chart-2);">AI Behavioral<br>Analysis</div>
+    <div class="arrow">→</div>
+    <div class="step" style="border-color:var(--chart-3);">Change<br>Detection</div>
+    <div class="arrow">→</div>
+    <div class="step" style="border-color:var(--chart-4);">Social Graph<br>Intelligence</div>
+    <div class="arrow">→</div>
+    <div class="step" style="border-color:var(--chart-5);">Alerts</div>
+  </div>
+
+  <div class="grid-4" style="margin-bottom:0.6em;">
+    <div class="stat"><span class="num" style="color:var(--chart-1);font-size:1.4em;">13</span><span class="label">Tracked Accounts</span></div>
+    <div class="stat"><span class="num" style="color:var(--chart-2);font-size:1.4em;">359</span><span class="label">Tweets Ingested</span></div>
+    <div class="stat"><span class="num" style="color:var(--chart-3);font-size:1.4em;">134k</span><span class="label">Tokens Used</span></div>
+    <div class="stat"><span class="num" style="color:var(--chart-4);font-size:1.4em;">89%</span><span class="label">Pipeline Success</span></div>
+  </div>
+
+  <div class="grid-3" style="margin-bottom:0.5em;">
+    <div class="stat"><span class="num" style="color:var(--fg-muted);font-size:1.1em;">44</span><span class="label">Pipeline Runs</span></div>
+    <div class="stat"><span class="num" style="color:var(--fg-muted);font-size:1.1em;">1,859</span><span class="label">Social Connections</span></div>
+    <div class="stat"><span class="num" style="color:var(--fg-muted);font-size:1.1em;">11</span><span class="label">Profiles Built</span></div>
+  </div>
+
+  <div class="card" style="border-left:3px solid var(--primary);">
+    <p style="margin:0;font-size:0.85em;">
+      <strong class="accent">Working prototype</strong> — behavioral fingerprinting, change detection, social graph,
+      Telegram alerts, crash-resilient job engine. Now: <strong>how do we scale this for the team?</strong>
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 3 — Vision (Mind Map)
+     ═══════════════════════════════════════════════════════════════ -->
+<section data-background-color="oklch(0.145 0 0)">
+  <h2 style="margin-bottom:0.1em;">Vision</h2>
+
+  <svg viewBox="0 0 1000 540" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:530px;overflow:visible;">
+    <defs>
+      <style>
+        .mm-ctr  { font-family:'Geist Mono',monospace; font-size:20px; font-weight:800; text-anchor:middle; dominant-baseline:central; fill:oklch(0.985 0 0); }
+        .mm-cat  { font-family:'Geist Mono',monospace; font-size:16px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+        .mm-leaf { font-family:'Geist Mono',monospace; font-size:12px; font-weight:500; text-anchor:middle; dominant-baseline:central; fill:oklch(0.82 0 0); }
+        .mm-branch { fill:none; stroke-width:3; }
+        .mm-twig   { fill:none; stroke-width:1.5; opacity:0.5; }
+      </style>
+    </defs>
+
+    <!-- ── Center node (always visible) ── -->
+    <rect x="410" y="243" width="180" height="54" rx="6" style="fill:oklch(0.77 0.20 131 / 8%);stroke:oklch(0.77 0.20 131);stroke-width:2;"/>
+    <text x="500" y="270" class="mm-ctr">TrendX</text>
+
+    <!-- ═══ Fragment 0: Multi-Source Intelligence (top-left) ═══ -->
+    <g class="fragment fade-up" data-fragment-index="0">
+      <!-- Main branch: center top-edge → category bottom-center -->
+      <path d="M 450,243 Q 335,185 220,148" class="mm-branch" style="stroke:oklch(0.90 0.18 127);"/>
+      <!-- Category node: 220×46 centered at (220,125) -->
+      <rect x="110" y="102" width="220" height="46" rx="5" style="fill:oklch(0.90 0.18 127 / 8%);stroke:oklch(0.90 0.18 127);stroke-width:1.5;"/>
+      <text x="220" y="125" class="mm-cat" style="fill:oklch(0.90 0.18 127);">Multi-Source Intel</text>
+      <!-- Leaf branches: category top-edge → leaf bottom-edge -->
+      <line x1="155" y1="102" x2="85"  y2="64" class="mm-twig" style="stroke:oklch(0.90 0.18 127);"/>
+      <line x1="220" y1="102" x2="220" y2="54" class="mm-twig" style="stroke:oklch(0.90 0.18 127);"/>
+      <line x1="285" y1="102" x2="355" y2="64" class="mm-twig" style="stroke:oklch(0.90 0.18 127);"/>
+      <!-- Leaf nodes: 130×32 -->
+      <rect x="20"  y="32" width="130" height="32" rx="4" style="fill:oklch(0.90 0.18 127 / 4%);stroke:oklch(0.90 0.18 127 / 25%);stroke-width:1;"/>
+      <text x="85"  y="48" class="mm-leaf">GitHub</text>
+      <rect x="155" y="22" width="130" height="32" rx="4" style="fill:oklch(0.90 0.18 127 / 4%);stroke:oklch(0.90 0.18 127 / 25%);stroke-width:1;"/>
+      <text x="220" y="38" class="mm-leaf">LinkedIn</text>
+      <rect x="290" y="32" width="130" height="32" rx="4" style="fill:oklch(0.90 0.18 127 / 4%);stroke:oklch(0.90 0.18 127 / 25%);stroke-width:1;"/>
+      <text x="355" y="48" class="mm-leaf">Funding DBs</text>
+    </g>
+
+    <!-- ═══ Fragment 1: Team Collaboration (top-right) ═══ -->
+    <g class="fragment fade-up" data-fragment-index="1">
+      <!-- Main branch: center top-edge → category bottom-center -->
+      <path d="M 550,243 Q 665,185 780,148" class="mm-branch" style="stroke:oklch(0.85 0.21 129);"/>
+      <!-- Category node: 220×46 centered at (780,125) -->
+      <rect x="670" y="102" width="220" height="46" rx="5" style="fill:oklch(0.85 0.21 129 / 8%);stroke:oklch(0.85 0.21 129);stroke-width:1.5;"/>
+      <text x="780" y="125" class="mm-cat" style="fill:oklch(0.85 0.21 129);">Team Collaboration</text>
+      <!-- Leaf branches: category top-edge → leaf bottom-edge -->
+      <line x1="725" y1="102" x2="660" y2="64" class="mm-twig" style="stroke:oklch(0.85 0.21 129);"/>
+      <line x1="780" y1="102" x2="780" y2="54" class="mm-twig" style="stroke:oklch(0.85 0.21 129);"/>
+      <line x1="835" y1="102" x2="915" y2="64" class="mm-twig" style="stroke:oklch(0.85 0.21 129);"/>
+      <!-- Leaf nodes: 130×32 -->
+      <rect x="595" y="32" width="130" height="32" rx="4" style="fill:oklch(0.85 0.21 129 / 4%);stroke:oklch(0.85 0.21 129 / 25%);stroke-width:1;"/>
+      <text x="660" y="48" class="mm-leaf">Watchlists</text>
+      <rect x="715" y="22" width="130" height="32" rx="4" style="fill:oklch(0.85 0.21 129 / 4%);stroke:oklch(0.85 0.21 129 / 25%);stroke-width:1;"/>
+      <text x="780" y="38" class="mm-leaf">Activity Feeds</text>
+      <rect x="850" y="32" width="130" height="32" rx="4" style="fill:oklch(0.85 0.21 129 / 4%);stroke:oklch(0.85 0.21 129 / 25%);stroke-width:1;"/>
+      <text x="915" y="48" class="mm-leaf">Role Access</text>
+    </g>
+
+    <!-- ═══ Fragment 2: Custom Alert Rules (bottom-left) ═══ -->
+    <g class="fragment fade-up" data-fragment-index="2">
+      <!-- Main branch: center bottom-edge → category top-center -->
+      <path d="M 450,297 Q 335,355 220,392" class="mm-branch" style="stroke:oklch(0.77 0.20 131);"/>
+      <!-- Category node: 220×46 centered at (220,415) -->
+      <rect x="110" y="392" width="220" height="46" rx="5" style="fill:oklch(0.77 0.20 131 / 8%);stroke:oklch(0.77 0.20 131);stroke-width:1.5;"/>
+      <text x="220" y="415" class="mm-cat" style="fill:oklch(0.77 0.20 131);">Custom Alerts</text>
+      <!-- Leaf branches: category bottom-edge → leaf top-edge -->
+      <line x1="155" y1="438" x2="85"  y2="472" class="mm-twig" style="stroke:oklch(0.77 0.20 131);"/>
+      <line x1="220" y1="438" x2="220" y2="482" class="mm-twig" style="stroke:oklch(0.77 0.20 131);"/>
+      <line x1="285" y1="438" x2="355" y2="472" class="mm-twig" style="stroke:oklch(0.77 0.20 131);"/>
+      <!-- Leaf nodes: 130×32 -->
+      <rect x="20"  y="472" width="130" height="32" rx="4" style="fill:oklch(0.77 0.20 131 / 4%);stroke:oklch(0.77 0.20 131 / 25%);stroke-width:1;"/>
+      <text x="85"  y="488" class="mm-leaf">Keyword Triggers</text>
+      <rect x="155" y="482" width="130" height="32" rx="4" style="fill:oklch(0.77 0.20 131 / 4%);stroke:oklch(0.77 0.20 131 / 25%);stroke-width:1;"/>
+      <text x="220" y="498" class="mm-leaf">Convergence</text>
+      <rect x="290" y="472" width="130" height="32" rx="4" style="fill:oklch(0.77 0.20 131 / 4%);stroke:oklch(0.77 0.20 131 / 25%);stroke-width:1;"/>
+      <text x="355" y="488" class="mm-leaf">Custom Rules</text>
+    </g>
+
+    <!-- ═══ Fragment 3: Integration (bottom-right) ═══ -->
+    <g class="fragment fade-up" data-fragment-index="3">
+      <!-- Main branch: center bottom-edge → category top-center -->
+      <path d="M 550,297 Q 665,355 780,392" class="mm-branch" style="stroke:oklch(0.65 0.18 132);"/>
+      <!-- Category node: 220×46 centered at (780,415) -->
+      <rect x="670" y="392" width="220" height="46" rx="5" style="fill:oklch(0.65 0.18 132 / 8%);stroke:oklch(0.65 0.18 132);stroke-width:1.5;"/>
+      <text x="780" y="415" class="mm-cat" style="fill:oklch(0.65 0.18 132);">Integration</text>
+      <!-- Leaf branches: category bottom-edge → leaf top-edge -->
+      <line x1="725" y1="438" x2="660" y2="472" class="mm-twig" style="stroke:oklch(0.65 0.18 132);"/>
+      <line x1="780" y1="438" x2="780" y2="482" class="mm-twig" style="stroke:oklch(0.65 0.18 132);"/>
+      <line x1="835" y1="438" x2="915" y2="472" class="mm-twig" style="stroke:oklch(0.65 0.18 132);"/>
+      <!-- Leaf nodes: 130×32 -->
+      <rect x="595" y="472" width="130" height="32" rx="4" style="fill:oklch(0.65 0.18 132 / 4%);stroke:oklch(0.65 0.18 132 / 25%);stroke-width:1;"/>
+      <text x="660" y="488" class="mm-leaf">REST API</text>
+      <rect x="715" y="482" width="130" height="32" rx="4" style="fill:oklch(0.65 0.18 132 / 4%);stroke:oklch(0.65 0.18 132 / 25%);stroke-width:1;"/>
+      <text x="780" y="498" class="mm-leaf">CRM Sync</text>
+      <rect x="850" y="472" width="130" height="32" rx="4" style="fill:oklch(0.65 0.18 132 / 4%);stroke:oklch(0.65 0.18 132 / 25%);stroke-width:1;"/>
+      <text x="915" y="488" class="mm-leaf">Slack / Notion</text>
+    </g>
+  </svg>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 4 — Scaling Strategy
+     ═══════════════════════════════════════════════════════════════ -->
+<section data-background-color="oklch(0.145 0 0)">
+  <h2 style="margin-bottom:0.3em;">Architecture</h2>
+
+  <!-- Fragment 0: Design requirements (the "why") -->
+  <div class="fragment fade-up" data-fragment-index="0" style="display:flex;gap:0.6em;justify-content:center;flex-wrap:wrap;margin-bottom:0.6em;">
+    <div class="card" style="flex:0 1 auto;padding:0.35em 0.7em;border-top:2px solid var(--chart-1);font-size:0.72em;text-align:center;">
+      <strong style="color:var(--chart-1);">Fault Isolation</strong><br><span class="muted">Crash in jobs ≠ crash in UI</span>
+    </div>
+    <div class="card" style="flex:0 1 auto;padding:0.35em 0.7em;border-top:2px solid var(--chart-3);font-size:0.72em;text-align:center;">
+      <strong style="color:var(--chart-3);">Scale Independently</strong><br><span class="muted">Add workers without touching frontend</span>
+    </div>
+    <div class="card" style="flex:0 1 auto;padding:0.35em 0.7em;border-top:2px solid var(--amber);font-size:0.72em;text-align:center;">
+      <strong style="color:var(--amber);">Async Job Queue</strong><br><span class="muted">Retry, schedule, prioritize</span>
+    </div>
+    <div class="card" style="flex:0 1 auto;padding:0.35em 0.7em;border-top:2px solid var(--chart-4);font-size:0.72em;text-align:center;">
+      <strong style="color:var(--chart-4);">Team Ready</strong><br><span class="muted">Multi-user, concurrent access</span>
+    </div>
+    <div class="card" style="flex:0 1 auto;padding:0.35em 0.7em;border-top:2px solid var(--chart-5);font-size:0.72em;text-align:center;">
+      <strong style="color:var(--chart-5);">Internal Only</strong><br><span class="muted">No CDN, no public cloud</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:1.2em;align-items:flex-start;justify-content:center;">
+
+    <!-- ── Current: Dev Machine (fragment 1) ── -->
+    <div class="fragment fade-up" data-fragment-index="1" style="flex:0 1 380px;">
+      <h3 style="color:var(--fg-muted);margin-bottom:0.3em;font-size:0.9em;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:0.25em;"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        Current: Dev Machine
+      </h3>
+      <div style="border:1.5px dashed var(--fg-dim);border-radius:8px;padding:0.8em 0.7em;">
+        <div class="arch-box" style="margin-bottom:0.4em;text-align:left;display:flex;align-items:center;gap:0.5em;">
+          <!-- Bun logo -->
+          <svg width="22" height="22" viewBox="0 0 24 24" style="flex-shrink:0;"><path fill="#FBF0DF" d="M12 22.596c6.628 0 12-4.338 12-9.688 0-3.318-2.057-6.248-5.219-7.986-1.286-.715-2.297-1.357-3.139-1.89C14.058 2.025 13.08 1.404 12 1.404c-1.097 0-2.334.785-3.966 1.821a49.92 49.92 0 0 1-2.816 1.697C2.057 6.66 0 9.59 0 12.908c0 5.35 5.372 9.687 12 9.687v.001ZM10.599 4.715c.334-.759.503-1.58.498-2.409 0-.145.202-.187.23-.029.658 2.783-.902 4.162-2.057 4.624-.124.048-.199-.121-.103-.209a5.763 5.763 0 0 0 1.432-1.977Zm2.058-.102a5.82 5.82 0 0 0-.782-2.306v-.016c-.069-.123.086-.263.185-.172 1.962 2.111 1.307 4.067.556 5.051-.082.103-.23-.003-.189-.126a5.85 5.85 0 0 0 .23-2.431Zm1.776-.561a5.727 5.727 0 0 0-1.612-1.806v-.014c-.112-.085-.024-.274.114-.218 2.595 1.087 2.774 3.18 2.459 4.407a.116.116 0 0 1-.049.071.11.11 0 0 1-.153-.026.122.122 0 0 1-.022-.083 5.891 5.891 0 0 0-.737-2.331Zm-5.087.561c-.617.546-1.282.76-2.063 1-.117 0-.195-.078-.156-.181 1.752-.909 2.376-1.649 2.999-2.778 0 0 .155-.118.188.085 0 .304-.349 1.329-.968 1.874Zm4.945 11.237a2.957 2.957 0 0 1-.937 1.553c-.346.346-.8.565-1.286.62a2.178 2.178 0 0 1-1.327-.62 2.955 2.955 0 0 1-.925-1.553.244.244 0 0 1 .064-.198.234.234 0 0 1 .193-.069h3.965a.226.226 0 0 1 .19.07c.05.053.073.125.063.197Zm-5.458-2.176a1.862 1.862 0 0 1-2.384-.245 1.98 1.98 0 0 1-.233-2.447c.207-.319.503-.566.848-.713a1.84 1.84 0 0 1 1.092-.11c.366.075.703.261.967.531a1.98 1.98 0 0 1 .408 2.114 1.931 1.931 0 0 1-.698.869v.001Zm8.495.005a1.86 1.86 0 0 1-2.381-.253 1.964 1.964 0 0 1-.547-1.366c0-.384.11-.76.32-1.079.207-.319.503-.567.849-.713a1.844 1.844 0 0 1 1.093-.108c.367.076.704.262.968.534a1.98 1.98 0 0 1 .4 2.117 1.932 1.932 0 0 1-.702.868Z"/></svg>
+          <div>
+            <strong>All-in-One Process</strong>
+            <small>Next.js + Hono API + Job Runner</small>
+          </div>
+        </div>
+        <div style="text-align:center;color:var(--fg-dim);font-size:0.7em;line-height:1;">↕</div>
+        <div class="arch-box layer-3" style="margin-top:0.4em;text-align:left;display:flex;align-items:center;gap:0.5em;">
+          <!-- SQLite logo -->
+          <svg width="22" height="22" viewBox="0 0 24 24" style="flex-shrink:0;"><path fill="#44A8E0" d="M21.678.521c-1.032-.92-2.28-.55-3.513.544a8.71 8.71 0 0 0-.547.535c-2.109 2.237-4.066 6.38-4.674 9.544.237.48.422 1.093.544 1.561a13.044 13.044 0 0 1 .164.703s-.019-.071-.096-.296l-.05-.146a1.689 1.689 0 0 0-.033-.08c-.138-.32-.518-.995-.686-1.289-.143.423-.27.818-.376 1.176.484.884.778 2.4.778 2.4s-.025-.099-.147-.442c-.107-.303-.644-1.244-.772-1.464-.217.804-.304 1.346-.226 1.478.152.256.296.698.422 1.186.286 1.1.485 2.44.485 2.44l.017.224a22.41 22.41 0 0 0 .056 2.748c.095 1.146.273 2.13.5 2.657l.155-.084c-.334-1.038-.47-2.399-.41-3.967.09-2.398.642-5.29 1.661-8.304 1.723-4.55 4.113-8.201 6.3-9.945-1.993 1.8-4.692 7.63-5.5 9.788-.904 2.416-1.545 4.684-1.931 6.857.666-2.037 2.821-2.912 2.821-2.912s1.057-1.304 2.292-3.166c-.74.169-1.955.458-2.362.629-.6.251-.762.337-.762.337s1.945-1.184 3.613-1.72C21.695 7.9 24.195 2.767 21.678.521m-18.573.543A1.842 1.842 0 0 0 1.27 2.9v16.608a1.84 1.84 0 0 0 1.835 1.834h9.418a22.953 22.953 0 0 1-.052-2.707c-.006-.062-.011-.141-.016-.2a27.01 27.01 0 0 0-.473-2.378c-.121-.47-.275-.898-.369-1.057-.116-.197-.098-.31-.097-.432 0-.12.015-.245.037-.386a9.98 9.98 0 0 1 .234-1.045l.217-.028c-.017-.035-.014-.065-.031-.097l-.041-.381a32.8 32.8 0 0 1 .382-1.194l.2-.019c-.008-.016-.01-.038-.018-.053l-.043-.316c.63-3.28 2.587-7.443 4.8-9.791.066-.069.133-.128.198-.194Z"/></svg>
+          <div>
+            <strong>SQLite</strong>
+            <small>Single-writer, embedded</small>
+          </div>
+        </div>
+      </div>
+      <p class="muted" style="text-align:center;margin-top:0.25em;font-size:0.75em;">~50 accounts</p>
+    </div>
+
+    <!-- ── Arrow (fragment 2) ── -->
+    <div class="fragment fade-up" data-fragment-index="2" style="align-self:center;padding-top:1.5em;">
+      <svg width="48" height="32" viewBox="0 0 48 32" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 16h34"/>
+        <polyline points="32 8 42 16 32 24"/>
+      </svg>
+    </div>
+
+    <!-- ── Target: Production VPS (fragment 2) ── -->
+    <div class="fragment fade-up" data-fragment-index="2" style="flex:0 1 420px;">
+      <h3 style="color:var(--chart-2);margin-bottom:0.3em;font-size:0.9em;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:0.25em;"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="18" r="1" fill="currentColor"/></svg>
+        Target: Production VPS
+      </h3>
+      <div style="border:1.5px solid var(--primary);border-radius:8px;padding:0.8em 0.7em;">
+        <!-- Reverse proxy — nginx logo -->
+        <div class="arch-box layer-1" style="text-align:left;display:flex;align-items:center;gap:0.5em;">
+          <svg width="22" height="22" viewBox="0 0 24 24" style="flex-shrink:0;"><path fill="#009639" d="M12 0L1.605 6v12L12 24l10.395-6V6L12 0zm6 16.59c0 .705-.646 1.29-1.529 1.29-.631 0-1.351-.255-1.801-.81l-6-7.141v6.66c0 .721-.57 1.29-1.274 1.29H7.32c-.721 0-1.29-.6-1.29-1.29V7.41c0-.705.63-1.29 1.5-1.29.646 0 1.38.255 1.83.81l5.97 7.141V7.41c0-.721.6-1.29 1.29-1.29h.075c.72 0 1.29.6 1.29 1.29v9.18H18z"/></svg>
+          <div>
+            <strong>Caddy / nginx</strong>
+            <small>Reverse proxy, TLS</small>
+          </div>
+        </div>
+        <div style="text-align:center;color:var(--fg-dim);font-size:0.7em;line-height:1;">↓</div>
+        <!-- Frontend — Next.js -->
+        <div class="arch-box layer-1" style="margin-top:0.3em;text-align:left;display:flex;align-items:center;gap:0.5em;">
+          <svg width="20" height="20" viewBox="0 0 24 24" style="flex-shrink:0;"><path fill="oklch(0.9 0 0)" d="M18.665 21.978C16.758 23.255 14.465 24 12 24 5.377 24 0 18.623 0 12S5.377 0 12 0s12 5.377 12 12c0 3.583-1.574 6.801-4.067 9.001L9.219 7.2H7.2v9.596h1.615V9.251l9.85 12.727Zm-3.332-8.533 1.6 2.061V7.2h-1.6v6.245Z"/></svg>
+          <div>
+            <strong>Next.js</strong>
+            <small>Frontend</small>
+          </div>
+        </div>
+        <div style="text-align:center;color:var(--fg-dim);font-size:0.7em;line-height:1;">↓</div>
+        <!-- Backend — Hono API -->
+        <div class="arch-box" style="margin-top:0.3em;border-color:#FF5B11;background:oklch(0.55 0.15 40 / 6%);text-align:left;display:flex;align-items:center;gap:0.5em;">
+          <svg width="20" height="20" viewBox="0 0 24 24" style="flex-shrink:0;"><path fill="#FF5B11" d="M12.445.002a45.529 45.529 0 0 0-5.252 8.146 8.595 8.595 0 0 1-.555-.53 27.796 27.796 0 0 0-1.205-1.542 8.762 8.762 0 0 0-1.251 2.12 20.743 20.743 0 0 0-1.448 5.88 8.867 8.867 0 0 0 .338 3.468c1.312 3.48 3.794 5.593 7.445 6.337 3.055.438 5.755-.333 8.097-2.312 2.677-2.59 3.359-5.634 2.047-9.132a33.287 33.287 0 0 0-2.988-5.59A91.34 91.34 0 0 0 12.615.053a.216.216 0 0 0-.17-.051Zm-.336 3.906a50.93 50.93 0 0 1 4.794 6.552c.448.767.817 1.57 1.108 2.41.606 2.386-.044 4.354-1.951 5.904-1.845 1.298-3.87 1.683-6.072 1.156-2.376-.737-3.75-2.335-4.121-4.794a5.107 5.107 0 0 1 .242-2.266c.358-.908.79-1.774 1.3-2.601l1.446-2.121a397.33 397.33 0 0 0 3.254-4.24Z"/></svg>
+          <div>
+            <strong>Hono API</strong>
+            <small>Backend</small>
+          </div>
+        </div>
+        <div style="text-align:center;color:var(--fg-dim);font-size:0.7em;line-height:1;">↓</div>
+        <!-- Workers + Redis -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4em;margin-top:0.3em;">
+          <div class="arch-box" style="border-color:var(--chart-4);text-align:left;display:flex;align-items:center;gap:0.4em;">
+            <!-- Bun logo (runtime for workers) -->
+            <svg width="20" height="20" viewBox="0 0 24 24" style="flex-shrink:0;"><path fill="#FBF0DF" d="M12 22.596c6.628 0 12-4.338 12-9.688 0-3.318-2.057-6.248-5.219-7.986-1.286-.715-2.297-1.357-3.139-1.89C14.058 2.025 13.08 1.404 12 1.404c-1.097 0-2.334.785-3.966 1.821a49.92 49.92 0 0 1-2.816 1.697C2.057 6.66 0 9.59 0 12.908c0 5.35 5.372 9.687 12 9.687v.001ZM10.599 4.715c.334-.759.503-1.58.498-2.409 0-.145.202-.187.23-.029.658 2.783-.902 4.162-2.057 4.624-.124.048-.199-.121-.103-.209a5.763 5.763 0 0 0 1.432-1.977Zm2.058-.102a5.82 5.82 0 0 0-.782-2.306v-.016c-.069-.123.086-.263.185-.172 1.962 2.111 1.307 4.067.556 5.051-.082.103-.23-.003-.189-.126a5.85 5.85 0 0 0 .23-2.431Zm1.776-.561a5.727 5.727 0 0 0-1.612-1.806v-.014c-.112-.085-.024-.274.114-.218 2.595 1.087 2.774 3.18 2.459 4.407a.116.116 0 0 1-.049.071.11.11 0 0 1-.153-.026.122.122 0 0 1-.022-.083 5.891 5.891 0 0 0-.737-2.331Zm-5.087.561c-.617.546-1.282.76-2.063 1-.117 0-.195-.078-.156-.181 1.752-.909 2.376-1.649 2.999-2.778 0 0 .155-.118.188.085 0 .304-.349 1.329-.968 1.874Zm4.945 11.237a2.957 2.957 0 0 1-.937 1.553c-.346.346-.8.565-1.286.62a2.178 2.178 0 0 1-1.327-.62 2.955 2.955 0 0 1-.925-1.553.244.244 0 0 1 .064-.198.234.234 0 0 1 .193-.069h3.965a.226.226 0 0 1 .19.07c.05.053.073.125.063.197Zm-5.458-2.176a1.862 1.862 0 0 1-2.384-.245 1.98 1.98 0 0 1-.233-2.447c.207-.319.503-.566.848-.713a1.84 1.84 0 0 1 1.092-.11c.366.075.703.261.967.531a1.98 1.98 0 0 1 .408 2.114 1.931 1.931 0 0 1-.698.869v.001Zm8.495.005a1.86 1.86 0 0 1-2.381-.253 1.964 1.964 0 0 1-.547-1.366c0-.384.11-.76.32-1.079.207-.319.503-.567.849-.713a1.844 1.844 0 0 1 1.093-.108c.367.076.704.262.968.534a1.98 1.98 0 0 1 .4 2.117 1.932 1.932 0 0 1-.702.868Z"/></svg>
+            <div>
+              <strong>Workers</strong>
+              <small>BullMQ</small>
+            </div>
+          </div>
+          <div class="arch-box" style="border-color:var(--amber);text-align:left;display:flex;align-items:center;gap:0.4em;">
+            <!-- Redis logo -->
+            <svg width="20" height="20" viewBox="0 0 24 24" style="flex-shrink:0;"><path fill="#DC382D" d="M22.71 13.145c-1.66 2.092-3.452 4.483-7.038 4.483-3.203 0-4.397-2.825-4.48-5.12.701 1.484 2.073 2.685 4.214 2.63 4.117-.133 6.94-3.852 6.94-7.239 0-4.05-3.022-6.972-8.268-6.972-3.752 0-8.4 1.428-11.455 3.685C2.59 6.937 3.885 9.958 4.35 9.626c2.648-1.904 4.748-3.13 6.784-3.744C8.12 9.244.886 17.05 0 18.425c.1 1.261 1.66 4.648 2.424 4.648.232 0 .431-.133.664-.365a100.49 100.49 0 0 0 5.54-6.765c.222 3.104 1.748 6.898 6.014 6.898 3.819 0 7.604-2.756 9.33-8.965.2-.764-.73-1.361-1.261-.73zm-4.349-5.013c0 1.959-1.926 2.922-3.685 2.922-.941 0-1.664-.247-2.235-.568 1.051-1.592 2.092-3.225 3.21-4.973 1.972.334 2.71 1.43 2.71 2.619z"/></svg>
+            <div>
+              <strong>Redis</strong>
+              <small>Queue + cache</small>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:center;color:var(--fg-dim);font-size:0.7em;line-height:1;">↓</div>
+        <!-- PostgreSQL logo -->
+        <div class="arch-box layer-3" style="margin-top:0.3em;text-align:left;display:flex;align-items:center;gap:0.5em;">
+          <svg width="22" height="22" viewBox="0 0 24 24" style="flex-shrink:0;"><path fill="#4169E1" d="M23.5594 14.7228a.5269.5269 0 0 0-.0563-.1191c-.139-.2632-.4768-.3418-1.0074-.2321-1.6533.3411-2.2935.1312-2.5256-.0191 1.342-2.0482 2.445-4.522 3.0411-6.8297.2714-1.0507.7982-3.5237.1222-4.7316a1.5641 1.5641 0 0 0-.1509-.235C21.6931.9086 19.8007.0248 17.5099.0005c-1.4947-.0158-2.7705.3461-3.1161.4794a9.449 9.449 0 0 0-.5159-.0816 8.044 8.044 0 0 0-1.3114-.1278c-1.1822-.0184-2.2038.2642-3.0498.8406-.8573-.3211-4.7888-1.645-7.2219.0788C.9359 2.1526.3086 3.8733.4302 6.3043c.0409.818.5069 3.334 1.2423 5.7436.4598 1.5065.9387 2.7019 1.4334 3.582.553.9942 1.1259 1.5933 1.7143 1.7895.4474.1491 1.1327.1441 1.8581-.7279.8012-.9635 1.5903-1.8258 1.9446-2.2069.4351.2355.9064.3625 1.39.3772a.0569.0569 0 0 0 .0004.0041 11.0312 11.0312 0 0 0-.2472.3054c-.3389.4302-.4094.5197-1.5002.7443-.3102.064-1.1344.2339-1.1464.8115-.0025.1224.0329.2309.0919.3268.2269.4231.9216.6097 1.015.6331 1.3345.3335 2.5044.092 3.3714-.6787-.017 2.231.0775 4.4174.3454 5.0874.2212.5529.7618 1.9045 2.4692 1.9043.2505 0 .5263-.0291.8296-.0941 1.7819-.3821 2.5557-1.1696 2.855-2.9059.1503-.8707.4016-2.8753.5388-4.1012.0169-.0703.0357-.1207.057-.1362.0007-.0005.0697-.0471.4272.0307a.3673.3673 0 0 0 .0443.0068l.2539.0223.0149.001c.8468.0384 1.9114-.1426 2.5312-.4308.6438-.2988 1.8057-1.0323 1.5951-1.6698z"/></svg>
+          <div>
+            <strong>PostgreSQL</strong>
+            <small>Same VPS or managed (Neon)</small>
+          </div>
+        </div>
+      </div>
+      <p class="muted" style="text-align:center;margin-top:0.25em;font-size:0.75em;">500+ accounts</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 5a — Understanding the Cost: Fixed Costs
+     ═══════════════════════════════════════════════════════════════ -->
+<section data-background-color="oklch(0.145 0 0)">
+  <h2>Understanding the Cost</h2>
+
+  <div class="scenario-banner" style="margin-bottom:0.5em;">1 account &middot; 30 days</div>
+
+  <div class="grid-2" style="gap:1em;">
+    <!-- Left column: Infrastructure -->
+    <div class="fragment fade-up" data-fragment-index="0">
+      <div class="card" style="border-top:3px solid var(--border);padding:0.6em 0.9em;">
+        <h3 style="color:var(--fg-muted);margin:0 0 0.3em;">Infrastructure</h3>
+        <span style="font-size:0.72em;color:var(--fg-dim);">Servers &amp; hosting</span>
+        <div style="text-align:center;margin-top:0.6em;">
+          <span class="cost-big" style="color:var(--fg-muted);">$6</span>
+          <span class="cost-unit">/month</span>
+          <span class="cost-detail">VPS (Hetzner CX33)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column: AI Pipeline -->
+    <div class="fragment fade-up" data-fragment-index="0">
+      <div class="card" style="border-top:3px solid var(--border);padding:0.6em 0.9em;">
+        <h3 style="color:var(--fg-muted);margin:0 0 0.3em;">AI Pipeline</h3>
+        <span style="font-size:0.72em;color:var(--fg-dim);">Analyzing tweets</span>
+        <div style="text-align:center;margin-top:0.6em;">
+          <span class="cost-big" style="color:var(--fg-muted);">$0.012</span>
+          <span class="cost-unit">/acct/month *</span>
+          <span class="cost-detail">~51k tokens (gpt-5-nano)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fragment 1: Footnote + transition -->
+  <div class="fragment fade-up" data-fragment-index="1">
+    <div class="footnotes">
+      * From real DB: 134,287 tokens &mdash; 13 accounts, 6 days
+    </div>
+    <div class="card" style="border-left:3px solid var(--primary);margin-top:0.5em;">
+      <p style="margin:0;font-size:0.88em;">
+        These costs are <strong>identical regardless of data collection strategy.</strong><br>
+        The variable cost is <strong class="accent">data collection</strong> &rarr;
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 5b — Data Collection: 4 Strategies
+     ═══════════════════════════════════════════════════════════════ -->
+<section data-background-color="oklch(0.145 0 0)">
+  <h2 style="margin-bottom:0.15em;">Data Collection Cost</h2>
+  <p class="muted" style="margin-bottom:0.3em;">Example account: <strong style="color:var(--fg);">500 tweets &middot; 500 followers</strong> &middot; ~30 new of each per month</p>
+
+  <!-- Fragment 0: X API (fetch all) — amber / expensive -->
+  <div class="fragment fade-up" data-fragment-index="0">
+    <div class="card" style="border-left:3px solid var(--amber);margin-bottom:0.25em;padding:0.4em 0.7em;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <h3 style="color:var(--amber);margin:0 0 0.1em;">X API (fetch all)</h3>
+        <span style="color:var(--amber);font-size:1.3em;font-weight:800;">$1.00<span class="cost-unit"> /acct/mo</span></span>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:0.1em 0.5em;font-size:0.68em;color:var(--fg-dim);">
+        <span style="color:var(--amber);font-weight:600;">1st fetch</span>
+        <span>500 tweets + 500 followers</span>
+        <span style="color:var(--amber);font-weight:600;">2nd+</span>
+        <span>500 tweets + 500 followers <span style="color:var(--amber);">&larr; same! re-reads everything</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fragment 1: Apify Actors — mid -->
+  <div class="fragment fade-up" data-fragment-index="1">
+    <div class="card" style="border-left:3px solid var(--chart-4);margin-bottom:0.25em;padding:0.4em 0.7em;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <h3 style="color:var(--chart-4);margin:0 0 0.1em;">Apify Actors</h3>
+        <span style="color:var(--chart-4);font-size:1.3em;font-weight:800;">$0.05<span class="cost-unit"> /acct/mo + $49 platform</span></span>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:0.1em 0.5em;font-size:0.68em;color:var(--fg-dim);">
+        <span style="color:var(--chart-4);font-weight:600;">1st scrape</span>
+        <span>500 tweets + 500 followers</span>
+        <span style="color:var(--chart-4);font-weight:600;">2nd+</span>
+        <span>500 tweets + 500 followers <span style="color:var(--chart-4);">&larr; re-scrapes everything</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fragment 2: Bird CLI — free -->
+  <div class="fragment fade-up" data-fragment-index="2">
+    <div class="card" style="border-left:3px solid var(--chart-1);margin-bottom:0.25em;padding:0.4em 0.7em;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <h3 style="color:var(--chart-1);margin:0 0 0.1em;">Bird CLI</h3>
+        <span style="color:var(--chart-1);font-size:1.3em;font-weight:800;">$0<span class="cost-unit"> /acct/mo</span></span>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:0.1em 0.5em;font-size:0.68em;color:var(--fg-dim);">
+        <span style="color:var(--chart-1);font-weight:600;">1st fetch</span>
+        <span>500 tweets + 500 followers</span>
+        <span style="color:var(--chart-1);font-weight:600;">2nd+</span>
+        <span>500 tweets + 500 followers (re-reads all, but free)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fragment 3: X API (optimised) — the winner -->
+  <div class="fragment fade-up" data-fragment-index="3">
+    <div class="card" style="border-left:3px solid var(--primary);margin-bottom:0.25em;padding:0.4em 0.7em;background:oklch(0.77 0.20 131 / 5%);">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <h3 style="color:var(--primary);margin:0 0 0.1em;">X API (optimised)</h3>
+        <span style="text-align:right;"><span style="font-size:0.58em;color:var(--fg-dim);">1st month ~$1.00 &rarr; </span><span style="color:var(--primary);font-size:1.3em;font-weight:800;">~$0.06</span><span class="cost-unit"> /acct/mo ongoing</span></span>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:0.1em 0.5em;font-size:0.68em;">
+        <span style="color:var(--primary);font-weight:600;">1st fetch</span>
+        <span style="color:var(--fg-dim);">500 tweets + 500 followers (full backlog)</span>
+        <span style="color:var(--primary);font-weight:600;">2nd+</span>
+        <span style="color:var(--chart-1);font-weight:600;">~1 new tweet + ~1 new follower per run &mdash; 94% fewer reads</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footnotes" style="margin-top:0.2em;">
+    <code style="font-size:1em;background:none;padding:0;color:var(--fg-dim);">since_id</code> for tweets &middot; known-ID cutoff for followers &middot; Sources: developer.x.com, apify.com (Feb 2026)
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 6 — What Happens at Scale? (4 strategy comparison)
+     ═══════════════════════════════════════════════════════════════ -->
+<section data-background-color="oklch(0.145 0 0)">
+  <h2 style="margin-bottom:0.1em;">What Happens at Scale?</h2>
+  <p class="muted" style="margin-bottom:0.3em;">Monthly cost over time &mdash;
+    <span style="color:oklch(0.78 0.15 200);font-weight:600;">&#9679; 100</span> &middot;
+    <span style="color:oklch(0.82 0.17 85);font-weight:600;">&#9679; 500</span> &middot;
+    <span style="color:oklch(0.72 0.18 25);font-weight:600;">&#9679; 1K</span> accounts
+  </p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4em;">
+
+    <!-- ════ Chart 1: X API (fetch all) — $0–$1,100 ════ -->
+    <div class="fragment fade-up" data-fragment-index="0" style="background:oklch(0.16 0 0);padding:0.35em 0.5em 0.2em;">
+      <div style="text-align:center;margin-bottom:0.1em;">
+        <span style="color:oklch(0.795 0.155 85);font-weight:700;font-size:0.7em;">X API (fetch all)</span>
+        <span style="font-size:0.55em;color:var(--fg-dim);margin-left:0.3em;">$1.00 /acct/mo</span>
+      </div>
+      <svg viewBox="0 0 420 195" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+        <!-- Grid $0–$1,100 -->
+        <line x1="65" y1="170" x2="380" y2="170" style="stroke:oklch(1 0 0/10%);stroke-width:0.5;"/>
+        <text x="58" y="173" text-anchor="end" style="font-family:'Geist Mono',monospace;font-size:9px;fill:oklch(0.4 0 0);">$0</text>
+        <line x1="65" y1="102" x2="380" y2="102" style="stroke:oklch(1 0 0/5%);stroke-width:0.5;stroke-dasharray:3,3;"/>
+        <text x="58" y="105" text-anchor="end" style="font-family:'Geist Mono',monospace;font-size:9px;fill:oklch(0.4 0 0);">$500</text>
+        <line x1="65" y1="34" x2="380" y2="34" style="stroke:oklch(1 0 0/5%);stroke-width:0.5;stroke-dasharray:3,3;"/>
+        <text x="58" y="37" text-anchor="end" style="font-family:'Geist Mono',monospace;font-size:9px;fill:oklch(0.4 0 0);">$1K</text>
+        <!-- X axis -->
+        <text x="75" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M1</text>
+        <text x="135" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M2</text>
+        <text x="195" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M3</text>
+        <text x="255" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M4</text>
+        <text x="315" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M5</text>
+        <text x="375" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M6</text>
+        <!-- 1K: flat $1,018 -->
+        <polygon points="75,31 375,31 375,170 75,170" style="fill:oklch(0.72 0.18 25 / 6%);"/>
+        <line x1="75" y1="31" x2="375" y2="31" style="stroke:oklch(0.72 0.18 25);stroke-width:2.5;"/>
+        <circle cx="75" cy="31" r="3" style="fill:oklch(0.72 0.18 25);"/>
+        <text x="388" y="35" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.72 0.18 25);font-weight:700;">$1,018</text>
+        <!-- 500: flat $512 -->
+        <line x1="75" y1="100" x2="375" y2="100" style="stroke:oklch(0.82 0.17 85);stroke-width:2;"/>
+        <circle cx="75" cy="100" r="3" style="fill:oklch(0.82 0.17 85);"/>
+        <text x="388" y="104" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.82 0.17 85);font-weight:700;">$512</text>
+        <!-- 100: flat $107 -->
+        <line x1="75" y1="155" x2="375" y2="155" style="stroke:oklch(0.78 0.15 200);stroke-width:2;"/>
+        <circle cx="75" cy="155" r="3" style="fill:oklch(0.78 0.15 200);"/>
+        <text x="388" y="159" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.78 0.15 200);font-weight:700;">$107</text>
+      </svg>
+      <div style="text-align:center;font-size:0.5em;color:var(--fg-dim);margin-top:0.1em;">
+        /yr: <span style="color:oklch(0.78 0.15 200);">$1,286</span> &middot; <span style="color:oklch(0.82 0.17 85);">$6,144</span> &middot; <span style="color:oklch(0.72 0.18 25);">$12,216</span>
+      </div>
+    </div>
+
+    <!-- ════ Chart 2: Apify — $0–$150 ════ -->
+    <div class="fragment fade-up" data-fragment-index="1" style="background:oklch(0.16 0 0);padding:0.35em 0.5em 0.2em;">
+      <div style="text-align:center;margin-bottom:0.1em;">
+        <span style="color:oklch(0.65 0.15 270);font-weight:700;font-size:0.7em;">Apify Actors</span>
+        <span style="font-size:0.55em;color:var(--fg-dim);margin-left:0.3em;">$0.05 /acct/mo + $49 platform</span>
+      </div>
+      <svg viewBox="0 0 420 195" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+        <!-- Grid $0–$150 -->
+        <line x1="65" y1="170" x2="380" y2="170" style="stroke:oklch(1 0 0/10%);stroke-width:0.5;"/>
+        <text x="58" y="173" text-anchor="end" style="font-family:'Geist Mono',monospace;font-size:9px;fill:oklch(0.4 0 0);">$0</text>
+        <line x1="65" y1="120" x2="380" y2="120" style="stroke:oklch(1 0 0/5%);stroke-width:0.5;stroke-dasharray:3,3;"/>
+        <text x="58" y="123" text-anchor="end" style="font-family:'Geist Mono',monospace;font-size:9px;fill:oklch(0.4 0 0);">$50</text>
+        <line x1="65" y1="70" x2="380" y2="70" style="stroke:oklch(1 0 0/5%);stroke-width:0.5;stroke-dasharray:3,3;"/>
+        <text x="58" y="73" text-anchor="end" style="font-family:'Geist Mono',monospace;font-size:9px;fill:oklch(0.4 0 0);">$100</text>
+        <line x1="65" y1="20" x2="380" y2="20" style="stroke:oklch(1 0 0/5%);stroke-width:0.5;stroke-dasharray:3,3;"/>
+        <text x="58" y="23" text-anchor="end" style="font-family:'Geist Mono',monospace;font-size:9px;fill:oklch(0.4 0 0);">$150</text>
+        <!-- X axis -->
+        <text x="75" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M1</text>
+        <text x="135" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M2</text>
+        <text x="195" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M3</text>
+        <text x="255" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M4</text>
+        <text x="315" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M5</text>
+        <text x="375" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M6</text>
+        <!-- 1K: flat $117 -->
+        <line x1="75" y1="53" x2="375" y2="53" style="stroke:oklch(0.72 0.18 25);stroke-width:2.5;"/>
+        <circle cx="75" cy="53" r="3" style="fill:oklch(0.72 0.18 25);"/>
+        <text x="388" y="57" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.72 0.18 25);font-weight:700;">$117</text>
+        <!-- 500: flat $86 -->
+        <line x1="75" y1="84" x2="375" y2="84" style="stroke:oklch(0.82 0.17 85);stroke-width:2;"/>
+        <circle cx="75" cy="84" r="3" style="fill:oklch(0.82 0.17 85);"/>
+        <text x="388" y="88" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.82 0.17 85);font-weight:700;">$86</text>
+        <!-- 100: flat $61 -->
+        <line x1="75" y1="109" x2="375" y2="109" style="stroke:oklch(0.78 0.15 200);stroke-width:2;"/>
+        <circle cx="75" cy="109" r="3" style="fill:oklch(0.78 0.15 200);"/>
+        <text x="388" y="113" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.78 0.15 200);font-weight:700;">$61</text>
+      </svg>
+      <div style="text-align:center;font-size:0.5em;color:var(--fg-dim);margin-top:0.1em;">
+        /yr: <span style="color:oklch(0.78 0.15 200);">$734</span> &middot; <span style="color:oklch(0.82 0.17 85);">$1,032</span> &middot; <span style="color:oklch(0.72 0.18 25);">$1,404</span>
+      </div>
+    </div>
+
+    <!-- ════ Chart 3: Bird CLI — $0–$25 ════ -->
+    <div class="fragment fade-up" data-fragment-index="2" style="background:oklch(0.16 0 0);padding:0.35em 0.5em 0.2em;">
+      <div style="text-align:center;margin-bottom:0.1em;">
+        <span style="color:oklch(0.77 0.20 131);font-weight:700;font-size:0.7em;">Bird CLI</span>
+        <span style="font-size:0.55em;color:var(--fg-dim);margin-left:0.3em;">$0 /acct/mo (free scraping)</span>
+      </div>
+      <svg viewBox="0 0 420 195" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+        <!-- Grid $0–$25 -->
+        <line x1="65" y1="170" x2="380" y2="170" style="stroke:oklch(1 0 0/10%);stroke-width:0.5;"/>
+        <text x="58" y="173" text-anchor="end" style="font-family:'Geist Mono',monospace;font-size:9px;fill:oklch(0.4 0 0);">$0</text>
+        <line x1="65" y1="110" x2="380" y2="110" style="stroke:oklch(1 0 0/5%);stroke-width:0.5;stroke-dasharray:3,3;"/>
+        <text x="58" y="113" text-anchor="end" style="font-family:'Geist Mono',monospace;font-size:9px;fill:oklch(0.4 0 0);">$10</text>
+        <line x1="65" y1="50" x2="380" y2="50" style="stroke:oklch(1 0 0/5%);stroke-width:0.5;stroke-dasharray:3,3;"/>
+        <text x="58" y="53" text-anchor="end" style="font-family:'Geist Mono',monospace;font-size:9px;fill:oklch(0.4 0 0);">$20</text>
+        <!-- X axis -->
+        <text x="75" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M1</text>
+        <text x="135" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M2</text>
+        <text x="195" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M3</text>
+        <text x="255" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M4</text>
+        <text x="315" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M5</text>
+        <text x="375" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M6</text>
+        <!-- 1K: flat $18 -->
+        <line x1="75" y1="62" x2="375" y2="62" style="stroke:oklch(0.72 0.18 25);stroke-width:2.5;"/>
+        <circle cx="75" cy="62" r="3" style="fill:oklch(0.72 0.18 25);"/>
+        <text x="388" y="66" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.72 0.18 25);font-weight:700;">$18</text>
+        <!-- 500: flat $12 -->
+        <line x1="75" y1="98" x2="375" y2="98" style="stroke:oklch(0.82 0.17 85);stroke-width:2;"/>
+        <circle cx="75" cy="98" r="3" style="fill:oklch(0.82 0.17 85);"/>
+        <text x="388" y="102" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.82 0.17 85);font-weight:700;">$12</text>
+        <!-- 100: flat $7 -->
+        <line x1="75" y1="127" x2="375" y2="127" style="stroke:oklch(0.78 0.15 200);stroke-width:2;"/>
+        <circle cx="75" cy="127" r="3" style="fill:oklch(0.78 0.15 200);"/>
+        <text x="388" y="131" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.78 0.15 200);font-weight:700;">$7</text>
+      </svg>
+      <div style="text-align:center;font-size:0.5em;color:var(--fg-dim);margin-top:0.1em;">
+        /yr: <span style="color:oklch(0.78 0.15 200);">$86</span> &middot; <span style="color:oklch(0.82 0.17 85);">$144</span> &middot; <span style="color:oklch(0.72 0.18 25);">$216</span>
+      </div>
+    </div>
+
+    <!-- ════ Chart 4: X API (optimised) — $0–$1,100 ════ -->
+    <div class="fragment fade-up" data-fragment-index="3" style="background:oklch(0.16 0 0);padding:0.35em 0.5em 0.2em;border:1px solid oklch(0.77 0.20 131 / 30%);">
+      <div style="text-align:center;margin-bottom:0.1em;">
+        <span style="color:var(--primary);font-weight:700;font-size:0.7em;">X API (optimised)</span>
+        <span style="font-size:0.55em;color:var(--fg-dim);margin-left:0.3em;">M1 ~$1.00 &rarr; ~$0.06 /acct/mo</span>
+      </div>
+      <svg viewBox="0 0 420 195" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+        <!-- Grid $0–$1,100 -->
+        <line x1="65" y1="170" x2="380" y2="170" style="stroke:oklch(1 0 0/10%);stroke-width:0.5;"/>
+        <text x="58" y="173" text-anchor="end" style="font-family:'Geist Mono',monospace;font-size:9px;fill:oklch(0.4 0 0);">$0</text>
+        <line x1="65" y1="102" x2="380" y2="102" style="stroke:oklch(1 0 0/5%);stroke-width:0.5;stroke-dasharray:3,3;"/>
+        <text x="58" y="105" text-anchor="end" style="font-family:'Geist Mono',monospace;font-size:9px;fill:oklch(0.4 0 0);">$500</text>
+        <line x1="65" y1="34" x2="380" y2="34" style="stroke:oklch(1 0 0/5%);stroke-width:0.5;stroke-dasharray:3,3;"/>
+        <text x="58" y="37" text-anchor="end" style="font-family:'Geist Mono',monospace;font-size:9px;fill:oklch(0.4 0 0);">$1K</text>
+        <!-- X axis -->
+        <text x="75" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M1</text>
+        <text x="135" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M2</text>
+        <text x="195" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M3</text>
+        <text x="255" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M4</text>
+        <text x="315" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M5</text>
+        <text x="375" y="185" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.4 0 0);">M6</text>
+        <!-- 1K: spike $1,018 → $78 -->
+        <polygon points="75,31 135,159 195,159 255,159 315,159 375,159 375,170 75,170" style="fill:oklch(0.72 0.18 25 / 8%);"/>
+        <polyline points="75,31 135,159 195,159 255,159 315,159 375,159" fill="none" style="stroke:oklch(0.72 0.18 25);stroke-width:2.5;"/>
+        <circle cx="75" cy="31" r="3" style="fill:oklch(0.72 0.18 25);"/>
+        <circle cx="135" cy="159" r="2.5" style="fill:oklch(0.72 0.18 25);"/>
+        <text x="82" y="26" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.72 0.18 25);font-weight:700;">$1,018</text>
+        <text x="388" y="153" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.72 0.18 25);font-weight:700;">$78</text>
+        <!-- 500: spike $512 → $42 -->
+        <polyline points="75,100 135,164 195,164 255,164 315,164 375,164" fill="none" style="stroke:oklch(0.82 0.17 85);stroke-width:2;"/>
+        <circle cx="75" cy="100" r="3" style="fill:oklch(0.82 0.17 85);"/>
+        <circle cx="135" cy="164" r="2" style="fill:oklch(0.82 0.17 85);"/>
+        <text x="388" y="161" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.82 0.17 85);font-weight:700;">$42</text>
+        <!-- 100: spike $107 → $13 -->
+        <polyline points="75,155 135,168 195,168 255,168 315,168 375,168" fill="none" style="stroke:oklch(0.78 0.15 200);stroke-width:2;"/>
+        <circle cx="75" cy="155" r="3" style="fill:oklch(0.78 0.15 200);"/>
+        <circle cx="135" cy="168" r="2" style="fill:oklch(0.78 0.15 200);"/>
+        <text x="388" y="171" style="font-family:'Geist Mono',monospace;font-size:8px;fill:oklch(0.78 0.15 200);font-weight:700;">$13</text>
+        <!-- Annotations -->
+        <text x="75" y="193" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:7px;fill:oklch(0.5 0 0);">full fetch</text>
+        <text x="255" y="193" text-anchor="middle" style="font-family:'Geist Mono',monospace;font-size:7px;fill:oklch(0.5 0 0);">delta only</text>
+      </svg>
+      <div style="text-align:center;font-size:0.5em;color:var(--fg-dim);margin-top:0.1em;">
+        /yr: <span style="color:oklch(0.78 0.15 200);">$253</span> &middot; <span style="color:oklch(0.82 0.17 85);">$974</span> &middot; <span style="color:oklch(0.72 0.18 25);">$1,876</span>
+      </div>
+    </div>
+
+  </div>
+
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 7 — Risk Analysis
+     ═══════════════════════════════════════════════════════════════ -->
+<section data-background-color="oklch(0.145 0 0)">
+  <h2>Risk Analysis</h2>
+
+  <table>
+    <tr>
+      <th style="width:8%;">Level</th>
+      <th style="width:25%;">Risk</th>
+      <th style="width:35%;">Impact</th>
+      <th>Mitigation</th>
+    </tr>
+    <tr class="fragment fade-up" data-fragment-index="0">
+      <td><span class="tag tag-primary">LOW</span></td>
+      <td>AI costs at scale</td>
+      <td>$0.012/acct/mo — $6 for 500 accounts</td>
+      <td>Already negligible; Ollama as free fallback</td>
+    </tr>
+    <tr class="fragment fade-up" data-fragment-index="1">
+      <td><span class="tag tag-primary">LOW</span></td>
+      <td>LLM hallucinations</td>
+      <td>False positive alerts erode trust</td>
+      <td>Structured outputs, evidence linking, confidence scores</td>
+    </tr>
+    <tr class="fragment fade-up" data-fragment-index="2">
+      <td><span class="tag tag-primary">LOW</span></td>
+      <td>AI vendor lock-in</td>
+      <td>Provider raises prices or degrades</td>
+      <td>Multi-provider: OpenAI, OpenRouter, Ollama</td>
+    </tr>
+    <tr class="fragment fade-up" data-fragment-index="3">
+      <td><span class="tag tag-amber">MED</span></td>
+      <td>SQLite concurrency</td>
+      <td>Single-writer blocks parallel jobs</td>
+      <td>PostgreSQL migration — Drizzle makes it a schema swap</td>
+    </tr>
+    <tr class="fragment fade-up" data-fragment-index="4">
+      <td><span class="tag tag-amber">MED</span></td>
+      <td>Rate limiting / bot detection</td>
+      <td>Twitter blocks collection IPs</td>
+      <td>Staggered fetches, proxy rotation, cache-first</td>
+    </tr>
+    <tr class="fragment fade-up" data-fragment-index="5">
+      <td><span class="tag tag-red">HIGH</span></td>
+      <td>Bird CLI taken down</td>
+      <td>Creator removed it — X pushes pay-per-use</td>
+      <td style="color:var(--chart-2);">→ next slides</td>
+    </tr>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 7b — The GraphQL Approach
+     ═══════════════════════════════════════════════════════════════ -->
+<section data-background-color="oklch(0.145 0 0)">
+  <h2>The GraphQL Approach</h2>
+  <p class="muted" style="margin-bottom:0.4em;">How Bird CLI reads Twitter without the official API</p>
+
+  <!-- How it works -->
+  <div class="fragment fade-up" data-fragment-index="0">
+    <div class="card" style="border-left:3px solid var(--primary);margin-bottom:0.4em;">
+      <h3 style="color:var(--primary);margin-bottom:0.15em;">How it works</h3>
+      <p style="margin:0;font-size:0.82em;color:var(--fg-muted);">
+        x.com's frontend fetches <strong>all data</strong> through an internal GraphQL API.
+        Bird CLI replicates these browser requests using cookie auth — looks like a normal user browsing.
+      </p>
+    </div>
+  </div>
+
+  <!-- Why it works -->
+  <div class="fragment fade-up" data-fragment-index="1">
+    <div class="card" style="border-left:3px solid var(--chart-1);margin-bottom:0.4em;">
+      <h3 style="color:var(--chart-1);margin-bottom:0.15em;">Why it works</h3>
+      <ul style="font-size:0.8em;margin:0;">
+        <li>Twitter <strong>can't break this API without breaking their own website</strong></li>
+        <li>Powers x.com since ~2022 — 600M+ monthly users depend on it</li>
+        <li>Query IDs rotate every 2-4 weeks, but Bird CLI <strong>auto-detects</strong> new IDs from public JS bundles</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Countermeasures -->
+  <div class="fragment fade-up" data-fragment-index="2">
+    <div class="card" style="border-left:3px solid var(--amber);margin-bottom:0.4em;">
+      <h3 style="color:var(--amber);margin-bottom:0.15em;">Twitter's countermeasures</h3>
+      <div class="grid-2" style="font-size:0.8em;">
+        <ul style="margin:0;">
+          <li>Query ID rotation (2-4 wks)</li>
+          <li>Datacenter IP banning</li>
+          <li>TLS fingerprinting</li>
+        </ul>
+        <ul style="margin:0;">
+          <li>Guest token &rarr; browser binding</li>
+          <li>Rate limiting (300 req/hr)</li>
+          <li>Cookie validation changes</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- The punchline -->
+  <div class="fragment fade-up" data-fragment-index="3">
+    <div class="card" style="border-left:3px solid var(--destructive);">
+      <p style="margin:0 0 0.3em;font-size:0.9em;">
+        Risk: Bird CLI <del style="opacity:0.5;">may disappear</del>&ensp;<strong style="color:var(--destructive);">It disappeared.</strong>
+        <span style="font-size:0.75em;color:var(--fg-dim);">(Feb 8, 2026)</span>
+      </p>
+      <ul style="font-size:0.8em;margin:0;">
+        <li>Creator took it down — <em>"X now pushes pay-per-use"</em></li>
+        <li>X reached out to collaborate on a <em>"sustainable path forward"</em> for agents</li>
+        <li>Code lives on in <strong>community forks</strong> (v0.8.0) — not lost, but unmaintained</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 7c — Scraper In-House?
+     ═══════════════════════════════════════════════════════════════ -->
+<section data-background-color="oklch(0.145 0 0)">
+  <h2>Data Collection: What Now?</h2>
+  <p class="muted" style="margin-bottom:0.3em;">HTML scraping works for tweets, but <strong>not for followers/following</strong> — those require the GraphQL layer.</p>
+
+  <table style="font-size:0.78em;">
+    <tr>
+      <th style="width:22%;">Option</th>
+      <th style="width:10%;">Effort</th>
+      <th style="width:10%;">Cost</th>
+      <th>Trade-offs</th>
+    </tr>
+    <tr class="fragment fade-up" data-fragment-index="0">
+      <td><strong>Use fork as-is</strong></td>
+      <td><span class="tag tag-primary">LOW</span></td>
+      <td>$0</td>
+      <td>Works today. No maintainer — breaks when Twitter rotates query IDs (~2-4 wks)</td>
+    </tr>
+    <tr class="fragment fade-up" data-fragment-index="1">
+      <td><strong>Fork &amp; maintain</strong></td>
+      <td><span class="tag tag-amber">MED</span></td>
+      <td>$0</td>
+      <td>We own the code. Need to track query ID rotation, ~2-4 hrs/month. Must understand Bird CLI internals</td>
+    </tr>
+    <tr class="fragment fade-up" data-fragment-index="2">
+      <td><strong>Build GraphQL client</strong></td>
+      <td><span class="tag tag-red">HIGH</span></td>
+      <td>$0</td>
+      <td>Full control, tailored to our needs. Weeks of dev + reverse engineering auth, query IDs, rate limits</td>
+    </tr>
+    <tr class="fragment fade-up" data-fragment-index="3">
+      <td><strong>Official X API</strong></td>
+      <td><span class="tag tag-primary">LOW</span></td>
+      <td>~$1/acct/mo</td>
+      <td>Stable, legal, supported. Expensive at scale — 500 accounts = $500/mo</td>
+    </tr>
+    <tr class="fragment fade-up" data-fragment-index="4">
+      <td><strong>Apify actors</strong></td>
+      <td><span class="tag tag-primary">LOW</span></td>
+      <td>~$0.05/acct</td>
+      <td>Managed service, they handle breakage. Platform fee $49/mo + per-result costs</td>
+    </tr>
+  </table>
+
+  <div class="fragment fade-up" data-fragment-index="5">
+    <div class="card" style="border-left:3px solid var(--primary);margin-top:0.3em;">
+      <ul style="margin:0;font-size:0.82em;list-style:none;padding:0;">
+        <li><strong class="accent">Short term:</strong> Fork &amp; maintain Bird CLI — we already know the codebase</li>
+        <li><strong class="accent">Fallback:</strong> Official X API behind provider abstraction — swap in one file</li>
+        <li><strong class="accent">Long term:</strong> Multi-source (GitHub, LinkedIn) reduces Twitter dependency entirely</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 9 — Production Roadmap (final slide)
+     ═══════════════════════════════════════════════════════════════ -->
+<section data-background-color="oklch(0.145 0 0)" data-background-gradient="radial-gradient(ellipse at 30% 60%, oklch(0.77 0.20 131 / 6%), transparent 55%), radial-gradient(ellipse at 70% 30%, oklch(0.53 0.14 132 / 5%), transparent 50%)">
+  <h2>Production Roadmap</h2>
+
+  <div style="position:relative;padding-left:2em;">
+    <div style="position:absolute;left:0.6em;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,var(--chart-1),var(--chart-3),var(--chart-5));"></div>
+
+    <div class="fragment fade-up" data-fragment-index="0" style="position:relative;margin-bottom:0.6em;">
+      <div style="position:absolute;left:-1.65em;top:0.15em;width:10px;height:10px;border-radius:50%;background:var(--chart-1);"></div>
+      <div class="card" style="margin:0;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <h3 style="margin:0;color:var(--chart-1);">Phase 1 — Harden</h3>
+          <span class="tag tag-bright">4-6 weeks</span>
+        </div>
+        <ul style="font-size:0.78em;margin-top:0.2em;">
+          <li>VPS deployment (Docker Compose + reverse proxy)</li>
+          <li>Authentication + secrets encryption</li>
+          <li>PostgreSQL migration + CI/CD pipeline</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="fragment fade-up" data-fragment-index="1" style="position:relative;margin-bottom:0.6em;">
+      <div style="position:absolute;left:-1.65em;top:0.15em;width:10px;height:10px;border-radius:50%;background:var(--chart-3);"></div>
+      <div class="card" style="margin:0;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <h3 style="margin:0;color:var(--chart-3);">Phase 2 — Scale</h3>
+          <span class="tag tag-primary">6-10 weeks</span>
+        </div>
+        <ul style="font-size:0.78em;margin-top:0.2em;">
+          <li>Worker pool for parallel analysis (BullMQ + Redis)</li>
+          <li>Embedding cache + batch API for cost control</li>
+          <li>Data source abstraction + official X API v2 fallback</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="fragment fade-up" data-fragment-index="2" style="position:relative;">
+      <div style="position:absolute;left:-1.65em;top:0.15em;width:10px;height:10px;border-radius:50%;background:var(--chart-5);"></div>
+      <div class="card" style="margin:0;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <h3 style="margin:0;color:var(--chart-5);">Phase 3 — Expand</h3>
+          <span class="tag tag-deep">12+ weeks</span>
+        </div>
+        <ul style="font-size:0.78em;margin-top:0.2em;">
+          <li>Multi-source: GitHub, LinkedIn, funding databases</li>
+          <li>Team collaboration + custom alert rules</li>
+          <li>API-first design for third-party integrations</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<!-- Footer -->
+<div class="slide-footer">TrendX · Production Strategy · Feb 2026</div>
+
+<!-- Reveal.js -->
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    width: 1200,
+    height: 700,
+    margin: 0.06,
+    transition: 'slide',
+    transitionSpeed: 'default',
+    backgroundTransition: 'fade',
+    center: false,
+    controls: true,
+    controlsTutorial: false,
+    progress: true,
+    history: true,
+  });
+</script>
+</body>
+</html>
