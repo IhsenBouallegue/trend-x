@@ -46,7 +46,7 @@ export function ConnectionsSheet({
     open ? accountId : null,
     direction,
     undefined,
-    500,
+    10000,
   );
 
   const filtered = useMemo(() => {

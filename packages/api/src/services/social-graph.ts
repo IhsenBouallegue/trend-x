@@ -43,7 +43,6 @@ export interface SocialSnapshotResult {
 // Constants
 // ---------------------------------------------------------------------------
 
-const KNOWN_PAGE_THRESHOLD = 3; // Stop after N consecutive all-known pages
 const PAGE_SIZE = 100;
 const PAGE_DELAY_MS = 1500;
 
@@ -85,39 +84,29 @@ async function getTwitterClient(): Promise<TwitterClient> {
 }
 
 // ---------------------------------------------------------------------------
-// Paginated fetching with smart early-stop
+// Paginated fetching
 // ---------------------------------------------------------------------------
 
-interface FetchResult {
-  users: SocialConnectionData[];
-  stoppedEarly: boolean;
-}
-
 /**
- * Paginated fetch with smart early-stop optimization.
- * Ported from debug-fetch-tweets.ts prototype.
+ * Paginated fetch — always fetches the complete list.
  *
  * @param fetchFn - Bird client method (getFollowing or getFollowers)
  * @param userId - Twitter user ID to fetch connections for
  * @param label - Label for logging ("following" | "followers")
- * @param knownIds - Optional set of known user IDs for early-stop optimization
  */
 async function fetchAllPaged(
   fetchFn: FetchFn,
   userId: string,
   label: string,
-  knownIds?: Set<string>,
   options?: {
     onProgress?: (detail: string) => Promise<void>;
     checkCancellation?: () => Promise<boolean>;
   },
-): Promise<FetchResult> {
+): Promise<SocialConnectionData[]> {
   const allUsers: SocialConnectionData[] = [];
   const seenIds = new Set<string>();
   let cursor: string | undefined;
   let page = 0;
-  let consecutiveKnownPages = 0;
-  let stoppedEarly = false;
 
   while (true) {
     page++;
@@ -136,7 +125,6 @@ async function fetchAllPaged(
       break;
     }
 
-    let newOnPage = 0;
     for (const u of result.users) {
       if (seenIds.has(u.id)) continue;
       seenIds.add(u.id);
@@ -150,33 +138,11 @@ async function fetchAllPaged(
         isBlueVerified: u.isBlueVerified ?? false,
         profileImageUrl: u.profileImageUrl ?? null,
       });
-      if (knownIds && !knownIds.has(u.id)) newOnPage++;
     }
 
-    if (knownIds) {
-      if (newOnPage === 0) {
-        consecutiveKnownPages++;
-        console.log(
-          `  Got ${result.users.length} users (all known) [${consecutiveKnownPages}/${KNOWN_PAGE_THRESHOLD}]`,
-        );
-        if (consecutiveKnownPages >= KNOWN_PAGE_THRESHOLD) {
-          console.log(
-            `  Stopping early - ${KNOWN_PAGE_THRESHOLD} consecutive pages of known users`,
-          );
-          stoppedEarly = true;
-          break;
-        }
-      } else {
-        consecutiveKnownPages = 0;
-        console.log(
-          `  Got ${result.users.length} users (${newOnPage} new, total: ${allUsers.length})`,
-        );
-      }
-    } else {
-      console.log(
-        `  Got ${result.users.length} users (total: ${allUsers.length})`,
-      );
-    }
+    console.log(
+      `  Got ${result.users.length} users (total: ${allUsers.length})`,
+    );
 
     // Cursor termination: nextCursor starts with "0|" or is falsy
     if (!result.nextCursor || result.nextCursor.startsWith("0|")) break;
@@ -189,35 +155,11 @@ async function fetchAllPaged(
 
     // Check cancellation between pages
     if (await options?.checkCancellation?.()) {
-      stoppedEarly = true;
       break;
     }
   }
 
-  return { users: allUsers, stoppedEarly };
-}
-
-// ---------------------------------------------------------------------------
-// Merge with previous (carry over on early stop)
-// ---------------------------------------------------------------------------
-
-/**
- * If stopped early, carry over user IDs from previous active connections
- * so we don't mark them as removed.
- */
-function mergeWithPrevious(
-  fetched: SocialConnectionData[],
-  previousUserIds: Set<string>,
-  stoppedEarly: boolean,
-): SocialConnectionData[] {
-  if (!stoppedEarly) return fetched;
-
-  // We only have full data for fetched users; for carried-over users
-  // we just need their IDs in the set (they won't be marked removed).
-  // The actual merge is handled at the diff level - we don't create
-  // phantom SocialConnectionData for carried users. Instead, we
-  // exclude them from "removed" in diffConnections.
-  return fetched;
+  return allUsers;
 }
 
 // ---------------------------------------------------------------------------
@@ -262,11 +204,9 @@ function diffConnections(
  * Main entry point for the social graph service.
  *
  * @param accountId - The account ID from the account table
- * @param fullFetch - If true, skip early-stop optimization (fetch all pages)
  */
 export async function fetchSocialSnapshot(
   accountId: string,
-  fullFetch?: boolean,
   options?: {
     onProgress?: (detail: string) => Promise<void>;
     checkCancellation?: () => Promise<boolean>;
@@ -330,74 +270,41 @@ export async function fetchSocialSnapshot(
 
   // d. Fetch following
   console.log(`\n[1/2] Fetching who @${handle} follows...`);
-  const followingResult = await fetchAllPaged(
+  const followingUsers = await fetchAllPaged(
     client.getFollowing.bind(client),
     lookup.userId,
     "following",
-    fullFetch ? undefined : knownFollowingIds,
     options,
   );
-  mergeWithPrevious(
-    followingResult.users,
-    knownFollowingIds,
-    followingResult.stoppedEarly,
-  );
-  console.log(`Total following fetched: ${followingResult.users.length}`);
+  console.log(`Total following fetched: ${followingUsers.length}`);
 
   // e. Fetch followers
   console.log(`\n[2/2] Fetching who follows @${handle}...`);
-  const followersResult = await fetchAllPaged(
+  const followerUsers = await fetchAllPaged(
     client.getFollowers.bind(client),
     lookup.userId,
     "followers",
-    fullFetch ? undefined : knownFollowerIds,
     options,
   );
-  mergeWithPrevious(
-    followersResult.users,
-    knownFollowerIds,
-    followersResult.stoppedEarly,
-  );
-  console.log(`Total followers fetched: ${followersResult.users.length}`);
+  console.log(`Total followers fetched: ${followerUsers.length}`);
 
   // f. Compute mutual connections
-  const followingUserIds = new Set(followingResult.users.map((u) => u.userId));
-  const followerUserIds = new Set(followersResult.users.map((u) => u.userId));
+  const followingUserIds = new Set(followingUsers.map((u) => u.userId));
+  const followerUserIds = new Set(followerUsers.map((u) => u.userId));
   const mutualUserIds = new Set(
     [...followingUserIds].filter((id) => followerUserIds.has(id)),
   );
 
   // g. Diff against previous active connections
-  // For early-stop: don't mark carried-over IDs as removed
-  const effectiveFollowingPrevIds = knownFollowingIds;
-  const effectiveFollowerPrevIds = knownFollowerIds;
-
-  // If stopped early, current fetched set is incomplete.
-  // We should only mark a user as removed if we did a full fetch.
-  const followingCurrentIds = new Set(followingResult.users.map((u) => u.userId));
-  const followerCurrentIds = new Set(followersResult.users.map((u) => u.userId));
-
-  // If stopped early, carry over previous IDs that weren't re-fetched
-  if (followingResult.stoppedEarly) {
-    for (const id of knownFollowingIds) {
-      followingCurrentIds.add(id);
-    }
-  }
-  if (followersResult.stoppedEarly) {
-    for (const id of knownFollowerIds) {
-      followerCurrentIds.add(id);
-    }
-  }
-
   const followingDiff = diffConnections(
-    followingCurrentIds,
-    effectiveFollowingPrevIds,
-    followingResult.users,
+    followingUserIds,
+    knownFollowingIds,
+    followingUsers,
   );
   const followersDiff = diffConnections(
-    followerCurrentIds,
-    effectiveFollowerPrevIds,
-    followersResult.users,
+    followerUserIds,
+    knownFollowerIds,
+    followerUsers,
   );
 
   // Fill in usernames for removed connections from DB data
@@ -412,23 +319,22 @@ export async function fetchSocialSnapshot(
   await options?.onProgress?.("Saving connections to database...");
 
   // Build connection arrays for batched upserts
-  const followingConnections: Array<{ accountId: string; user: SocialConnectionData; direction: string; now: number }> = [];
-  for (const user of followingResult.users) {
-    const direction = mutualUserIds.has(user.userId) ? "mutual" : "following";
-    followingConnections.push({ accountId, user, direction, now });
-    // If mutual, also add an explicit mutual direction entry
-    if (direction === "mutual") {
-      followingConnections.push({ accountId, user, direction: "mutual", now });
+  // Store all directions: every following user gets "following", every follower gets "follower",
+  // and mutual users additionally get a "mutual" entry. This keeps following/follower lists complete.
+  type ConnEntry = { accountId: string; user: SocialConnectionData; direction: string; now: number };
+  const allConnections: ConnEntry[] = [];
+
+  for (const user of followingUsers) {
+    allConnections.push({ accountId, user, direction: "following", now });
+    if (mutualUserIds.has(user.userId)) {
+      allConnections.push({ accountId, user, direction: "mutual", now });
     }
   }
 
-  const followerConnections: Array<{ accountId: string; user: SocialConnectionData; direction: string; now: number }> = [];
-  for (const user of followersResult.users) {
-    if (mutualUserIds.has(user.userId)) continue; // Already handled as mutual
-    followerConnections.push({ accountId, user, direction: "follower", now });
+  for (const user of followerUsers) {
+    allConnections.push({ accountId, user, direction: "follower", now });
   }
 
-  const allConnections = [...followingConnections, ...followerConnections];
   const totalConnections = allConnections.length;
 
   // Batch upsert all connections
@@ -506,20 +412,14 @@ export async function fetchSocialSnapshot(
     }
   }
 
-  // Determine snapshot type
-  const snapshotType: "full" | "partial" =
-    followingResult.stoppedEarly || followersResult.stoppedEarly
-      ? "partial"
-      : "full";
-
   // i. Insert social_snapshot row
   const [snapshotRow] = await db
     .insert(socialSnapshot)
     .values({
       accountId,
-      type: snapshotType,
-      followingCount: followingCurrentIds.size,
-      followerCount: followerCurrentIds.size,
+      type: "full",
+      followingCount: followingUserIds.size,
+      followerCount: followerUserIds.size,
       mutualCount: mutualUserIds.size,
       followingAdded: followingDiff.added.length,
       followingRemoved: followingDiff.removed.length,
@@ -529,8 +429,8 @@ export async function fetchSocialSnapshot(
     .returning({ id: socialSnapshot.id });
 
   console.log(
-    `\nSnapshot saved: ${snapshotRow.id} (${snapshotType})` +
-      ` | following: ${followingCurrentIds.size}, followers: ${followerCurrentIds.size}, mutual: ${mutualUserIds.size}` +
+    `\nSnapshot saved: ${snapshotRow.id}` +
+      ` | following: ${followingUserIds.size}, followers: ${followerUserIds.size}, mutual: ${mutualUserIds.size}` +
       ` | +${followingDiff.added.length}/-${followingDiff.removed.length} following` +
       ` | +${followersDiff.added.length}/-${followersDiff.removed.length} followers`,
   );
@@ -538,12 +438,12 @@ export async function fetchSocialSnapshot(
   // j. Return result
   return {
     snapshotId: snapshotRow.id,
-    followingCount: followingCurrentIds.size,
-    followerCount: followerCurrentIds.size,
+    followingCount: followingUserIds.size,
+    followerCount: followerUserIds.size,
     mutualCount: mutualUserIds.size,
     followingDiff,
     followersDiff,
-    type: snapshotType,
+    type: "full",
   };
 }
 

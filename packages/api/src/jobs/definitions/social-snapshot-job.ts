@@ -31,7 +31,6 @@ type SocialSnapshotStage = (typeof socialSnapshotStages)[number];
 
 const socialSnapshotInputSchema = z.object({
   accountId: z.string(),
-  fullFetch: z.boolean().optional(),
 });
 
 type SocialSnapshotInput = z.infer<typeof socialSnapshotInputSchema>;
@@ -63,7 +62,6 @@ defineJob<SocialSnapshotInput, SocialSnapshotStage>({
     // Fetch social graph (handles both following and followers)
     const snapshotResult = await fetchSocialSnapshot(
       input.accountId,
-      input.fullFetch,
       {
         onProgress: (detail) => context.updateProgress("fetching", detail),
         checkCancellation: () => context.checkCancellation(),
